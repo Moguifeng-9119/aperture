@@ -1,0 +1,124 @@
+# Aperture Gateway Configuration
+# https://github.com/2144983846/aperture
+
+server:
+  host: "0.0.0.0"
+  port: 8080
+  read_timeout: 30s
+  write_timeout: 120s
+  idle_timeout: 120s
+  max_request_size: 2097152  # 2MB
+
+admin:
+  key: "${APERTURE_ADMIN_KEY}"
+  port: 9090
+
+auth:
+  api_key_header: "Authorization"
+  rate_limit_default_rpm: 100
+
+routing:
+  default_model: "gpt-4o-mini"
+  default_provider: "openai"
+
+  strategies:
+    - name: "rule"
+      enabled: true
+      min_confidence: 0.8
+
+  complexity_map:
+    trivial:
+      provider: "groq"
+      model: "llama-3.1-8b-instant"
+    simple:
+      provider: "anthropic"
+      model: "claude-3-haiku-20240307"
+    moderate:
+      provider: "openai"
+      model: "gpt-4o-mini"
+    complex:
+      provider: "openai"
+      model: "gpt-4o"
+    expert:
+      provider: "anthropic"
+      model: "claude-3-opus-20240229"
+
+  rules:
+    - name: "support_inquiry"
+      priority: 80
+      keywords: ["reset password", "account locked", "billing question", "help"]
+      assign_complexity: "simple"
+    - name: "legal_review"
+      priority: 60
+      patterns: ["(?i)review (this|the) (contract|agreement|NDA|terms)"]
+      assign_complexity: "expert"
+
+  fallback:
+    retry:
+      max_attempts: 2
+      backoff: 500ms
+      max_backoff: 5s
+    models:
+      - provider: "openai"
+        model: "gpt-4o-mini"
+        on_http: [429, 503]
+      - provider: "groq"
+        model: "llama-3.1-8b-instant"
+        on_error: "all"
+
+providers:
+  - id: "openai"
+    type: "openai"
+    api_key: "${OPENAI_API_KEY}"
+    base_url: "https://api.openai.com/v1"
+    models:
+      - id: "gpt-4o-mini"
+        cost_per_1k_input: 0.00015
+        cost_per_1k_output: 0.0006
+        max_tokens: 128000
+      - id: "gpt-4o"
+        cost_per_1k_input: 0.0025
+        cost_per_1k_output: 0.01
+        max_tokens: 128000
+
+  - id: "anthropic"
+    type: "anthropic"
+    api_key: "${ANTHROPIC_API_KEY}"
+    models:
+      - id: "claude-3-haiku-20240307"
+        cost_per_1k_input: 0.00025
+        cost_per_1k_output: 0.00125
+        max_tokens: 200000
+      - id: "claude-3-opus-20240229"
+        cost_per_1k_input: 0.015
+        cost_per_1k_output: 0.075
+        max_tokens: 200000
+
+  - id: "groq"
+    type: "groq"
+    api_key: "${GROQ_API_KEY}"
+    models:
+      - id: "llama-3.1-8b-instant"
+        cost_per_1k_input: 0.00005
+        cost_per_1k_output: 0.00008
+        max_tokens: 128000
+
+  - id: "ollama"
+    type: "ollama"
+    base_url: "http://localhost:11434"
+    models:
+      - id: "llama3.2:3b"
+        cost_per_1k_input: 0.0
+        cost_per_1k_output: 0.0
+        max_tokens: 4096
+
+conversation:
+  max_messages: 50
+  ttl: 24h
+  persist: false
+
+logging:
+  level: "info"
+  format: "json"
+  output: "stdout"
+  access_log: true
