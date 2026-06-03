@@ -125,6 +125,8 @@ func (e *Engine) matchRule(rule Rule, text string, tokenCount int) bool {
 		if rule.MaxTokens == 0 || tokenCount <= rule.MaxTokens {
 			return true
 		}
+	} else if rule.MinTokens == 0 && rule.MaxTokens > 0 && tokenCount <= rule.MaxTokens {
+		return true
 	}
 
 	return false
