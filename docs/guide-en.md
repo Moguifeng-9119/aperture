@@ -310,6 +310,118 @@ routing:
 
 ---
 
+## Connect Your AI Tools
+
+Aperture sits between your AI tools and the LLM provider. It intercepts every request, decides whether it's simple or complex, and routes to the right model — saving you money automatically.
+
+---
+
+### Claude Code (cc switch)
+
+Claude Code uses Anthropic's Messages API format. Aperture supports this natively.
+
+**Step 1**: Find your Claude Code settings file:
+
+- **Windows**: `C:\Users\你的用户名\.claude\settings.json`
+- **macOS / Linux**: `~/.claude/settings.json`
+
+**Step 2**: Change the `ANTHROPIC_BASE_URL` to point to Aperture:
+
+```json
+{
+  "env": {
+    "ANTHROPIC_BASE_URL": "http://localhost:8080",
+    "ANTHROPIC_AUTH_TOKEN": "sk-your-deepseek-key"
+  }
+}
+```
+
+**Step 3**: Restart Claude Code.
+
+That's it. Aperture now intercepts every request, routes simple chats to Flash (cheap) and complex code reviews to Pro (powerful).
+
+> **How to verify**: Open `http://localhost:8080/dashboard` in your browser. Every Claude Code request will appear in the log, showing which model was actually used.
+
+---
+
+### OpenAI Codex
+
+Codex uses OpenAI's API format — no special setup needed.
+
+**Step 1**: Open Codex settings → find the API endpoint field.
+
+**Step 2**: Change it to:
+```
+http://localhost:8080/v1
+```
+
+**Step 3**: Set the model to `auto` (or leave whatever you had — Aperture ignores it).
+
+**Step 4**: Save and restart Codex.
+
+Now every Codex request goes through Aperture. Simple completions route to Flash, complex analysis routes to Pro.
+
+---
+
+### Open Claw
+
+Open Claw supports custom API endpoints.
+
+**Step 1**: Open Open Claw's config file (usually `.openclaw.json` or `config.yaml`).
+
+**Step 2**: Find the provider section and change the base URL:
+
+```yaml
+provider:
+  type: openai
+  base_url: http://localhost:8080/v1
+  api_key: anything     # Aperture doesn't require this locally
+  model: auto           # Aperture will choose the best model
+```
+
+Or if using the UI, find the "Custom Endpoint" field and enter `http://localhost:8080/v1`.
+
+**Step 3**: Save and restart Open Claw.
+
+---
+
+### Hermes
+
+Hermes is OpenAI-compatible and can use custom endpoints.
+
+**Step 1**: In Hermes settings, locate the API configuration.
+
+**Step 2**: Set the endpoint to:
+```
+http://localhost:8080/v1/chat/completions
+```
+
+**Step 3**: Set model to `auto`.
+
+**Step 4**: Save and restart.
+
+---
+
+### How to verify it's working
+
+1. Use your AI tool normally — send a simple message like "Hello"
+2. Open `http://localhost:8080/dashboard` in your browser
+3. Look at the **Request Log** — you'll see your request and which model was used
+4. Simple messages should show `deepseek-v4-flash`, complex ones should show `deepseek-v4-pro`
+
+### The key idea
+
+You don't need to change HOW you use these tools. You just change WHERE they send requests:
+
+```
+Before:  Tool → deepseek.com → always Pro → expensive
+After:   Tool → localhost:8080 (Aperture) → smart routing → cheap or Pro
+```
+
+**One Aperture instance serves ALL your tools at the same time.** Claude Code, Codex, Open Claw, Hermes — they all connect to `localhost:8080`.
+
+---
+
 ## Integrating Existing Apps
 
 ### OpenAI Python SDK

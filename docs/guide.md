@@ -310,6 +310,115 @@ routing:
 
 ---
 
+## 对接 AI 工具
+
+Aperture 的核心价值就是站在你的 AI 工具和模型之间，自动判断请求复杂度，把简单问题路由到便宜模型，复杂问题路由到强模型。**一个 Aperture 服务端，所有工具共享。**
+
+---
+
+### Claude Code（cc switch）
+
+Claude Code 用的是 Anthropic Messages API 格式，Aperture 原生支持。
+
+**第一步**：找到 Claude Code 的配置文件：
+
+- **Windows**：`C:\Users\你的用户名\.claude\settings.json`
+- **macOS / Linux**：`~/.claude/settings.json`
+
+**第二步**：把 `ANTHROPIC_BASE_URL` 改成 Aperture 的地址：
+
+```json
+{
+  "env": {
+    "ANTHROPIC_BASE_URL": "http://localhost:8080",
+    "ANTHROPIC_AUTH_TOKEN": "sk-你的deepseek密钥"
+  }
+}
+```
+
+**第三步**：重启 Claude Code。
+
+搞定。Aperture 现在拦截你的每个请求，打招呼走 Flash（便宜），写代码走 Pro（强）。
+
+> **验证方法**：浏览器打开 `http://localhost:8080/dashboard`，你的每个 Claude Code 请求都会出现在日志里，显示实际用了哪个模型。
+
+---
+
+### OpenAI Codex
+
+Codex 用的是 OpenAI API 格式，Aperture 原生支持。
+
+**第一步**：打开 Codex 设置 → 找到 API 端点。
+
+**第二步**：改成：
+```
+http://localhost:8080/v1
+```
+
+**第三步**：model 设为 `auto`（或不改也行，Aperture 会忽略）。
+
+**第四步**：保存，重启 Codex。
+
+---
+
+### Open Claw
+
+Open Claw 支持自定义 API 端点。
+
+**第一步**：打开 Open Claw 的配置文件（通常是 `.openclaw.json` 或界面设置）。
+
+**第二步**：找到 provider 部分，改成：
+
+```yaml
+provider:
+  type: openai
+  base_url: http://localhost:8080/v1
+  model: auto
+```
+
+如果用的是图形界面，找到"自定义端点"输入 `http://localhost:8080/v1`。
+
+**第三步**：保存，重启 Open Claw。
+
+---
+
+### Hermes
+
+Hermes 也是 OpenAI 兼容的。
+
+**第一步**：在 Hermes 设置里找到 API 配置。
+
+**第二步**：端点改成：
+```
+http://localhost:8080/v1/chat/completions
+```
+
+**第三步**：model 改成 `auto`。
+
+**第四步**：保存，重启。
+
+---
+
+### 怎么确认生效了
+
+1. 正常使用你的 AI 工具 — 发一条简单消息比如"你好"
+2. 浏览器打开 `http://localhost:8080/dashboard`
+3. 看 **Request Log** — 能看到你的请求和实际用的模型
+4. 简单消息应该显示用了 `deepseek-v4-flash`，复杂请求显示 `deepseek-v4-pro`
+
+### 核心思路
+
+你不需要改变**怎么用**这些工具，你只需要改变它们**往哪发请求**：
+
+```
+之前:  工具 → deepseek.com → 一律 Pro → 贵
+之后:  工具 → localhost:8080 (Aperture) → 智能选模型 → 便宜/Pro
+```
+
+**一个 Aperture 同时服务所有工具。** Claude Code、Codex、Open Claw、Hermes 全都可以连到同一个 `localhost:8080`。
+
+---
+
 ## 接入现有应用
 
 ### OpenAI Python SDK
@@ -342,14 +451,6 @@ const response = await client.chat.completions.create({
   model: "auto",
   messages: [{ role: "user", content: "Hello!" }],
 });
-```
-
-### LangChain
-
-```python
-from langchain_openai import ChatOpenAI
-
-llm = ChatOpenAI(model="auto", base_url="http://localhost:8080/v1")
 ```
 
 ### 任何 HTTP 客户端
