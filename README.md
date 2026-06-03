@@ -45,6 +45,24 @@ Every decision is **explained** in response headers. You can trust it — or ove
 
 ---
 
+## ⚖️ Why not LiteLLM / Portkey / OneAPI?
+
+| | Aperture | LiteLLM | Portkey | OneAPI |
+|---|:---:|:---:|:---:|:---:|
+| **Auto routing** | ✓ 3-tier (rules+embed+ML) | ✗ | ✗ | ✗ |
+| **Explainable decisions** | ✓ `X-Aperture-Reason` | ✗ | ✗ | ✗ |
+| **Cost dashboard** | ✓ built-in | ✗ | ✓ cloud only | ✗ |
+| **A/B testing** | ✓ | ✗ | ✗ | ✗ |
+| **Single binary** | ✓ Go, ~15MB | ✗ Python | ✗ cloud | ✗ Node.js |
+| **Self-hosted** | ✓ | ✓ | ✗ | ✓ |
+| **Training data export** | ✓ JSONL | ✗ | ✗ | ✗ |
+| **ARM64 builds** | ✓ | ✗ | ✗ | ✗ |
+| **License** | MIT | MIT | Apache 2.0 | MIT |
+
+> Aperture is the only gateway that **decides which model to use** — others just proxy to a pre-configured model.
+
+---
+
 ## 🚀 Quick Start
 
 ```bash
