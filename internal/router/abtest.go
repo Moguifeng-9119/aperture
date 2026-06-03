@@ -31,6 +31,16 @@ func NewABTestRouter(primary, shadow strategy.Strategy, defaultTarget strategy.R
 }
 
 func (r *ABTestRouter) Classify(ctx context.Context, req *strategy.Request) (*strategy.Decision, error) {
+	type shadowResult struct {
+		decision *strategy.Decision
+		err      error
+	}
+	shadowCh := make(chan shadowResult, 1)
+	go func() {
+		d, err := r.shadow.Classify(ctx, req)
+		shadowCh <- shadowResult{d, err}
+	}()
+
 	primaryDecision, err := r.primary.Classify(ctx, req)
 	if err != nil || primaryDecision == nil {
 		return &strategy.Decision{
@@ -41,7 +51,8 @@ func (r *ABTestRouter) Classify(ctx context.Context, req *strategy.Request) (*st
 		}, nil
 	}
 
-	shadowDecision, shadowErr := r.shadow.Classify(ctx, req)
+	shadowRes := <-shadowCh
+	shadowDecision, shadowErr := shadowRes.decision, shadowRes.err
 
 	agree := false
 	note := ""

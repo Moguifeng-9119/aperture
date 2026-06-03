@@ -123,19 +123,18 @@ func (s *Strategy) Classify(ctx context.Context, req *strategy.Request) (*strate
 func (s *Strategy) keywordVector(text string) []float64 {
 	text = strings.ToLower(text)
 	vec := make([]float64, len(s.vocab))
+	freq := make(map[string]int, len(s.vocab))
+	for _, token := range strings.Fields(text) {
+		freq[token]++
+	}
 	for i, word := range s.vocab {
-		vec[i] = float64(strings.Count(text, word))
+		vec[i] = float64(freq[word])
 	}
 	return vec
 }
 
 func combineMessages(msgs []strategy.Message) string {
-	var sb strings.Builder
-	for _, m := range msgs {
-		sb.WriteString(m.Content)
-		sb.WriteString(" ")
-	}
-	return strings.TrimSpace(sb.String())
+	return strategy.CombineMessages(msgs)
 }
 
 func cosineSimilarity(a, b []float64) float64 {

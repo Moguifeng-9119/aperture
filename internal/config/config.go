@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"strings"
 	"time"
@@ -175,7 +176,9 @@ func Load(path string) (*Config, error) {
 
 func applyEnvOverrides(cfg *Config) {
 	if v := os.Getenv("APERTURE_SERVER_PORT"); v != "" {
-		fmt.Sscanf(v, "%d", &cfg.Server.Port)
+		if n, err := fmt.Sscanf(v, "%d", &cfg.Server.Port); n != 1 || err != nil {
+			slog.Warn("invalid APERTURE_SERVER_PORT, using default", "value", v)
+		}
 	}
 	if v := os.Getenv("APERTURE_SERVER_HOST"); v != "" {
 		cfg.Server.Host = v
@@ -184,7 +187,9 @@ func applyEnvOverrides(cfg *Config) {
 		cfg.Admin.Key = v
 	}
 	if v := os.Getenv("APERTURE_ADMIN_PORT"); v != "" {
-		fmt.Sscanf(v, "%d", &cfg.Admin.Port)
+		if n, err := fmt.Sscanf(v, "%d", &cfg.Admin.Port); n != 1 || err != nil {
+			slog.Warn("invalid APERTURE_ADMIN_PORT, using default", "value", v)
+		}
 	}
 	if v := os.Getenv("APERTURE_LOG_LEVEL"); v != "" {
 		cfg.Logging.Level = v

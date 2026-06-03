@@ -42,6 +42,9 @@ func (s *simpleCounter) Count(text string) int {
 
 func NewEngine(rules []Rule, modelMap map[strategy.ComplexityLevel]strategy.RouteTarget, defaultTarget strategy.RouteTarget) *Engine {
 	for i := range rules {
+		for j := range rules[i].Keywords {
+			rules[i].Keywords[j] = strings.ToLower(rules[i].Keywords[j])
+		}
 		for _, p := range rules[i].Patterns {
 			compiled, err := regexp.Compile(p)
 			if err != nil {
@@ -68,7 +71,7 @@ func (e *Engine) Available() bool { return true }
 func (e *Engine) MinConfidence() float64 { return 0.8 }
 
 func (e *Engine) Classify(ctx context.Context, req *strategy.Request) (*strategy.Decision, error) {
-	combined := combineMessages(req.Messages)
+	combined := strings.ToLower(strategy.CombineMessages(req.Messages))
 	tokenCount := e.tokenCounter.Count(combined)
 
 	for _, rule := range e.rules {
@@ -110,7 +113,7 @@ func (e *Engine) Classify(ctx context.Context, req *strategy.Request) (*strategy
 
 func (e *Engine) matchRule(rule Rule, text string, tokenCount int) bool {
 	for _, kw := range rule.Keywords {
-		if strings.Contains(strings.ToLower(text), strings.ToLower(kw)) {
+		if strings.Contains(text, kw) {
 			return true
 		}
 	}

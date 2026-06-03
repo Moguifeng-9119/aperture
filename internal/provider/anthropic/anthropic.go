@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/2144983846/aperture/internal/config"
 	"github.com/2144983846/aperture/internal/provider"
@@ -31,7 +32,9 @@ func New(cfg config.ProviderConfig) (*Adapter, error) {
 	baseURL = strings.TrimSuffix(baseURL, "/")
 
 	a := &Adapter{
-		client:  &http.Client{},
+		client: &http.Client{
+			Timeout: 120 * time.Second,
+		},
 		apiKey:  cfg.APIKey,
 		baseURL: baseURL,
 	}

@@ -100,13 +100,24 @@ func (s *Store) GetMessages(sessionID string, lastN int) []Message {
 func (s *Store) reapLoop() {
 	ticker := time.NewTicker(5 * time.Minute)
 	for range ticker.C {
-		s.mu.Lock()
 		cutoff := time.Now().Add(-s.ttl)
+		s.mu.RLock()
+		staleIDs := make([]string, 0)
 		for id, sess := range s.sessions {
 			if sess.UpdatedAt.Before(cutoff) {
-				delete(s.sessions, id)
+				staleIDs = append(staleIDs, id)
 			}
 		}
-		s.mu.Unlock()
+		s.mu.RUnlock()
+
+		if len(staleIDs) > 0 {
+			s.mu.Lock()
+			for _, id := range staleIDs {
+				if sess, ok := s.sessions[id]; ok && sess.UpdatedAt.Before(cutoff) {
+					delete(s.sessions, id)
+				}
+			}
+			s.mu.Unlock()
+		}
 	}
 }

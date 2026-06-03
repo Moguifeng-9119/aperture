@@ -190,9 +190,13 @@ func (s *Strategy) Classify(ctx context.Context, req *strategy.Request) (*strate
 
 func (s *Strategy) extractFeatures(text string) []float64 {
 	text = strings.ToLower(text)
+	freq := make(map[string]int, len(s.model.Vocab))
+	for _, token := range strings.Fields(text) {
+		freq[token]++
+	}
 	features := make([]float64, len(s.model.Vocab))
 	for i, word := range s.model.Vocab {
-		features[i] = float64(strings.Count(text, word))
+		features[i] = float64(freq[word])
 	}
 	return features
 }

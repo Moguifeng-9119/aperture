@@ -1,6 +1,7 @@
 package dashboard
 
 import (
+	"crypto/subtle"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -18,6 +19,7 @@ type Dashboard struct {
 	router   *router.Router
 	registry *provider.Registry
 	feed     *LiveFeed
+	adminKey string
 }
 
 type LiveFeed struct {
@@ -37,17 +39,41 @@ type LiveEvent struct {
 	LatencyMs   int64   `json:"latency_ms"`
 }
 
-func New(s *store.Store, r *router.Router, reg *provider.Registry) *Dashboard {
+func New(s *store.Store, r *router.Router, reg *provider.Registry, adminKey string) *Dashboard {
 	d := &Dashboard{
 		store:    s,
 		router:   r,
 		registry: reg,
+		adminKey: adminKey,
 		feed: &LiveFeed{
 			events: make([]LiveEvent, 0, 100),
 			subs:   make(map[chan LiveEvent]struct{}),
 		},
 	}
 	return d
+}
+
+func (d *Dashboard) authGuard(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if !d.checkAuth(r) {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusUnauthorized)
+			json.NewEncoder(w).Encode(map[string]string{"error": "unauthorized"})
+			return
+		}
+		next(w, r)
+	}
+}
+
+func (d *Dashboard) checkAuth(r *http.Request) bool {
+	if d.adminKey == "" {
+		return true
+	}
+	key := r.Header.Get("X-Admin-Key")
+	if key == "" {
+		key = r.URL.Query().Get("key")
+	}
+	return subtle.ConstantTimeCompare([]byte(key), []byte(d.adminKey)) == 1
 }
 
 func (d *Dashboard) PushEvent(e LiveEvent) {
@@ -73,15 +99,15 @@ func (d *Dashboard) Handler() http.Handler {
 		w.Write([]byte(dashboardHTML))
 	})
 
-	mux.HandleFunc("/dashboard/data/overview", d.handleOverviewData)
-	mux.HandleFunc("/dashboard/data/routing", d.handleRoutingData)
-	mux.HandleFunc("/dashboard/data/keys", d.handleKeysData)
-	mux.HandleFunc("/dashboard/data/log", d.handleLogData)
-	mux.HandleFunc("/dashboard/data/analytics", d.handleAnalyticsJSON)
+	mux.HandleFunc("/dashboard/data/overview", d.authGuard(d.handleOverviewData))
+	mux.HandleFunc("/dashboard/data/routing", d.authGuard(d.handleRoutingData))
+	mux.HandleFunc("/dashboard/data/keys", d.authGuard(d.handleKeysData))
+	mux.HandleFunc("/dashboard/data/log", d.authGuard(d.handleLogData))
+	mux.HandleFunc("/dashboard/data/analytics", d.authGuard(d.handleAnalyticsJSON))
 
-	mux.HandleFunc("/dashboard/api/routing/test", d.handleRoutingTest)
-	mux.HandleFunc("/dashboard/api/keys/create", d.handleCreateKey)
-	mux.HandleFunc("/dashboard/api/keys/delete", d.handleDeleteKey)
+	mux.HandleFunc("/dashboard/api/routing/test", d.authGuard(d.handleRoutingTest))
+	mux.HandleFunc("/dashboard/api/keys/create", d.authGuard(d.handleCreateKey))
+	mux.HandleFunc("/dashboard/api/keys/delete", d.authGuard(d.handleDeleteKey))
 
 	mux.HandleFunc("/dashboard/sse", d.handleSSE)
 

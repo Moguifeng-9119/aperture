@@ -140,7 +140,7 @@ func (a *App) Run() error {
 		adminH := admin.New(a.db, a.router, a.cfg.Admin.Key)
 		mux.Handle("/admin/", adminH.Handler())
 
-		dash := dashboard.New(a.db, a.router, a.registry)
+		dash := dashboard.New(a.db, a.router, a.registry, a.cfg.Admin.Key)
 		mux.Handle("/dashboard", dash.Handler())
 		mux.Handle("/dashboard/", dash.Handler())
 		slog.Info("dashboard available at /dashboard")

@@ -1,6 +1,9 @@
 package strategy
 
-import "context"
+import (
+	"context"
+	"strings"
+)
 
 type ComplexityLevel int
 
@@ -58,6 +61,15 @@ type Strategy interface {
 	Classify(ctx context.Context, req *Request) (*Decision, error)
 	Available() bool
 	MinConfidence() float64
+}
+
+func CombineMessages(msgs []Message) string {
+	var sb strings.Builder
+	for _, m := range msgs {
+		sb.WriteString(m.Content)
+		sb.WriteString(" ")
+	}
+	return strings.TrimSpace(sb.String())
 }
 
 type RouteTarget struct {
