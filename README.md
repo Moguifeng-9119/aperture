@@ -68,6 +68,16 @@ Every decision is **explained** in response headers. You can trust it — or ove
 
 > 📖 **配置教程**：[中文](docs/guide.md) · [English](docs/guide-en.md) — 覆盖所有模型接入、多模型混合路由、SDK 集成
 
+### 启动后打开
+
+| 地址 | 用途 |
+|------|------|
+| `http://localhost:8080/dashboard` | 📊 实时仪表盘 — 请求量、费用、延迟、模型分布 |
+| `http://localhost:8080/health` | ✅ 健康检查 → `{"status":"ok"}` |
+| `http://localhost:8080/metrics` | 📈 Prometheus 指标 |
+| `http://localhost:8080/v1/chat/completions` | 🤖 OpenAI 格式 API |
+| `http://localhost:8080/v1/messages` | 🤖 Anthropic 格式 API（Claude Code 用） |
+
 ```bash
 git clone https://github.com/Moguifeng-9119/aperture.git
 cd aperture

@@ -36,6 +36,16 @@ Aperture 的做法：分析请求内容，自动把"你好"扔给便宜的模型
 
 > 📖 **配置教程**：[中文](docs/guide.md) · [English](docs/guide-en.md) — 覆盖 DeepSeek/通义千问/Kimi/GLM/MiniMax/MiMo 等国产模型接入
 
+### 启动后可以打开
+
+| 地址 | 用途 |
+|------|------|
+| `http://localhost:8080/dashboard` | 📊 实时仪表盘 — 请求量、费用、延迟、模型分布 |
+| `http://localhost:8080/health` | ✅ 健康检查 → `{"status":"ok"}` |
+| `http://localhost:8080/metrics` | 📈 Prometheus 指标 |
+| `http://localhost:8080/v1/chat/completions` | 🤖 OpenAI 格式 API |
+| `http://localhost:8080/v1/messages` | 🤖 Anthropic 格式 API（Claude Code 用） |
+
 ```bash
 git clone https://github.com/Moguifeng-9119/aperture.git
 cd aperture
