@@ -7,12 +7,14 @@ import (
 
 	"github.com/2144983846/aperture/internal/app"
 	"github.com/2144983846/aperture/internal/config"
+	"github.com/2144983846/aperture/internal/setup"
 	"github.com/2144983846/aperture/internal/store"
 )
 
 var (
 	configPath = flag.String("config", "config.yaml", "path to config file")
 	port       = flag.Int("port", 0, "override server port")
+	doSetup    = flag.Bool("setup", false, "run interactive configuration wizard")
 )
 
 func init() {
@@ -21,6 +23,15 @@ func init() {
 
 func main() {
 	flag.Parse()
+
+	if *doSetup {
+		w := setup.New()
+		if err := w.Run(); err != nil {
+			slog.Error("setup failed", "error", err)
+			os.Exit(1)
+		}
+		return
+	}
 
 	cfg, err := config.Load(*configPath)
 	if err != nil {

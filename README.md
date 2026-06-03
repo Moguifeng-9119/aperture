@@ -69,9 +69,13 @@ Every decision is **explained** in response headers. You can trust it — or ove
 ```bash
 git clone https://github.com/Moguifeng-9119/aperture.git && cd aperture
 make build
+
+# 交互式配置向导 — 回答问题即可生成 config.yaml
+./aperture -setup
+
+# 或手动配置
 cp config.example.yaml config.yaml
 export OPENAI_API_KEY="sk-..."
-./aperture
 ```
 
 ```bash
