@@ -211,7 +211,7 @@ func TestResolveProvider_None(t *testing.T) {
 	reg := provider.NewRegistry()
 	mockPipe := newMockPipeline()
 
-	srv := New(cfg, reg, mockPipe, nil, nil)
+	srv := New(cfg, reg, mockPipe, nil, nil, nil)
 
 	_, err := srv.resolveProvider("unknown-model")
 	if err == nil {
@@ -245,7 +245,7 @@ func TestServer_EmptyRegistry(t *testing.T) {
 	reg := provider.NewRegistry()
 	mockPipe := newMockPipeline()
 
-	srv := New(cfg, reg, mockPipe, nil, nil)
+	srv := New(cfg, reg, mockPipe, nil, nil, nil)
 	if srv == nil {
 		t.Fatal("expected server even with empty registry")
 	}
@@ -277,7 +277,7 @@ func newTestServer(t *testing.T) *Server {
 	convStore := conversation.NewStore(50, 24*time.Hour)
 	pipe := pipeline.New(r, reg, convStore, nil)
 
-	return New(cfg, reg, pipe, nil, nil)
+	return New(cfg, reg, pipe, nil, nil, nil)
 }
 
 func newMockPipeline() *pipeline.Pipeline {

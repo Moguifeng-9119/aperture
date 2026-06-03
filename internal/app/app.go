@@ -132,7 +132,7 @@ func (a *App) InitServer() {
 		}
 	}
 
-	a.server = server.New(a.cfg, a.registry, a.pipeline, rateMiddleware, a.router)
+	a.server = server.New(a.cfg, a.registry, a.pipeline, rateMiddleware, a.router, a.db)
 }
 
 func (a *App) Run() error {

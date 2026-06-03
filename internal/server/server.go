@@ -9,6 +9,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -18,6 +19,7 @@ import (
 	"github.com/2144983846/aperture/internal/provider"
 	"github.com/2144983846/aperture/internal/router"
 	"github.com/2144983846/aperture/internal/router/strategy"
+	"github.com/2144983846/aperture/internal/store"
 )
 
 type Server struct {
@@ -27,15 +29,17 @@ type Server struct {
 	pipeline        *pipeline.Pipeline
 	authMiddleware   func(http.Handler) http.Handler
 	apertureRouter  *router.Router
+	store           *store.Store
 }
 
-func New(cfg *config.Config, reg *provider.Registry, pipe *pipeline.Pipeline, authMiddleware func(http.Handler) http.Handler, r *router.Router) *Server {
+func New(cfg *config.Config, reg *provider.Registry, pipe *pipeline.Pipeline, authMiddleware func(http.Handler) http.Handler, r *router.Router, st *store.Store) *Server {
 	s := &Server{
 		cfg:            cfg,
 		registry:       reg,
 		pipeline:        pipe,
 		authMiddleware:   authMiddleware,
 		apertureRouter:   r,
+		store:            st,
 	}
 
 	s.chiRouter = chi.NewRouter()
@@ -313,18 +317,31 @@ func (s *Server) handleAnthropicMessages(w http.ResponseWriter, r *http.Request)
 	w.Header().Set("X-Aperture-Provider", targetProvider)
 	w.Header().Set("X-Aperture-Reason", reason)
 
-	if err := s.proxyAnthropic(w, r, bodyBytes, targetModel, body.Stream); err != nil {
-		writeError(w, http.StatusBadGateway, err.Error())
+	tokensIn, tokensOut := s.proxyAnthropic(w, r, bodyBytes, targetModel, body.Stream)
+	if s.store != nil && (tokensIn > 0 || tokensOut > 0) {
+		s.store.RecordDecision(&store.RoutingDecision{
+			Timestamp:  time.Now(),
+			RequestID:  fmt.Sprintf("req_%d", time.Now().UnixNano()),
+			Strategy:    "rule",
+			Complexity:  "auto",
+			Confidence:  1.0,
+			Model:       targetModel,
+			Provider:    targetProvider,
+			Reason:      reason,
+			TokensIn:    tokensIn,
+			TokensOut:   tokensOut,
+			HTTPStatus:  200,
+		})
 	}
 }
 
-func (s *Server) proxyAnthropic(w http.ResponseWriter, r *http.Request, bodyBytes []byte, model string, stream bool) error {
+func (s *Server) proxyAnthropic(w http.ResponseWriter, r *http.Request, bodyBytes []byte, model string, stream bool) (int, int) {
 	target := s.getProviderAnthropicURL(model)
 	if target == "" {
-		return fmt.Errorf("no Anthropic-compatible endpoint for model %q", model)
+		writeError(w, http.StatusBadGateway, fmt.Sprintf("no Anthropic endpoint for model %q", model))
+		return 0, 0
 	}
 
-	// Update model in the request body
 	var reqBody map[string]interface{}
 	json.Unmarshal(bodyBytes, &reqBody)
 	reqBody["model"] = model
@@ -335,10 +352,9 @@ func (s *Server) proxyAnthropic(w http.ResponseWriter, r *http.Request, bodyByte
 
 	proxyReq, err := http.NewRequestWithContext(ctx, http.MethodPost, target, bytes.NewReader(modified))
 	if err != nil {
-		return err
+		return 0, 0
 	}
 	proxyReq.Header.Set("Content-Type", "application/json")
-	proxyReq.Header.Set("Accept", r.Header.Get("Accept"))
 	if key := r.Header.Get("x-api-key"); key != "" {
 		proxyReq.Header.Set("x-api-key", key)
 	}
@@ -350,7 +366,7 @@ func (s *Server) proxyAnthropic(w http.ResponseWriter, r *http.Request, bodyByte
 	client := &http.Client{Timeout: s.cfg.Server.WriteTimeout}
 	resp, err := client.Do(proxyReq)
 	if err != nil {
-		return err
+		return 0, 0
 	}
 	defer resp.Body.Close()
 
@@ -362,22 +378,40 @@ func (s *Server) proxyAnthropic(w http.ResponseWriter, r *http.Request, bodyByte
 	w.WriteHeader(resp.StatusCode)
 
 	if stream {
+		var fullResponse bytes.Buffer
 		scanner := bufio.NewScanner(resp.Body)
 		flusher, _ := w.(http.Flusher)
 		for scanner.Scan() {
 			line := scanner.Bytes()
+			fullResponse.Write(line)
+			fullResponse.WriteByte('\n')
 			if _, err := w.Write(append(line, '\n')); err != nil {
-				return nil
+				break
 			}
 			if flusher != nil {
 				flusher.Flush()
 			}
 		}
-		return nil
+		return s.extractAnthropicTokens(fullResponse.Bytes())
 	}
 
-	io.Copy(w, resp.Body)
-	return nil
+	var buf bytes.Buffer
+	io.Copy(&buf, resp.Body)
+	w.Write(buf.Bytes())
+	return s.extractAnthropicTokens(buf.Bytes())
+}
+
+func (s *Server) extractAnthropicTokens(data []byte) (int, int) {
+	var resp struct {
+		Usage struct {
+			InputTokens  int `json:"input_tokens"`
+			OutputTokens int `json:"output_tokens"`
+		} `json:"usage"`
+	}
+	if json.Unmarshal(data, &resp) == nil {
+		return resp.Usage.InputTokens, resp.Usage.OutputTokens
+	}
+	return 0, 0
 }
 
 func (s *Server) getProviderAnthropicURL(model string) string {
