@@ -34,7 +34,7 @@ Aperture 的做法：分析请求内容，自动把"你好"扔给便宜的模型
 
 ## 🚀 5 分钟跑起来
 
-> 📖 **完整配置教程**：[docs/guide.md](docs/guide.md) — 覆盖 DeepSeek/通义千问/Kimi/GLM/MiniMax/MiMo 等国产模型接入
+> 📖 **配置教程**：[中文](docs/guide.md) · [English](docs/guide-en.md) — 覆盖 DeepSeek/通义千问/Kimi/GLM/MiniMax/MiMo 等国产模型接入
 
 ```bash
 git clone https://github.com/Moguifeng-9119/aperture.git

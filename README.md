@@ -66,7 +66,7 @@ Every decision is **explained** in response headers. You can trust it — or ove
 
 ## 🚀 Quick Start
 
-> 📖 **完整配置教程**：[docs/guide.md](docs/guide.md) — 覆盖所有模型接入、多模型混合路由、SDK 集成、Dashboard 使用
+> 📖 **配置教程**：[中文](docs/guide.md) · [English](docs/guide-en.md) — 覆盖所有模型接入、多模型混合路由、SDK 集成
 
 ```bash
 git clone https://github.com/Moguifeng-9119/aperture.git
