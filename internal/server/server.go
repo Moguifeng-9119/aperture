@@ -1,9 +1,12 @@
 package server
 
 import (
+	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 
@@ -52,6 +55,7 @@ func (s *Server) setupMiddleware() {
 func (s *Server) setupRoutes() {
 	s.router.Route("/v1", func(r chi.Router) {
 		r.Post("/chat/completions", s.handleChatCompletion)
+		r.Post("/messages", s.handleAnthropicMessages)
 		r.Get("/models", s.handleListModels)
 	})
 
@@ -223,6 +227,158 @@ func (s *Server) handleListModels(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(resp)
+}
+
+func (s *Server) handleAnthropicMessages(w http.ResponseWriter, r *http.Request) {
+	bodyBytes, err := io.ReadAll(r.Body)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "failed to read body")
+		return
+	}
+
+	var body struct {
+		Model    string `json:"model"`
+		Messages []struct {
+			Role    string `json:"role"`
+			Content []struct {
+				Type string `json:"type"`
+				Text string `json:"text"`
+			} `json:"content"`
+		} `json:"messages"`
+		Stream      bool    `json:"stream"`
+		MaxTokens   int     `json:"max_tokens"`
+		Temperature *float64 `json:"temperature,omitempty"`
+	}
+	if err := json.Unmarshal(bodyBytes, &body); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	if body.Model == "" {
+		writeError(w, http.StatusBadRequest, "model is required")
+		return
+	}
+
+	// Extract text for routing
+	var msgs []provider.Message
+	for _, m := range body.Messages {
+		text := ""
+		for _, c := range m.Content {
+			if c.Type == "text" {
+				text += c.Text
+			}
+		}
+		msgs = append(msgs, provider.Message{Role: m.Role, Content: text})
+	}
+
+	// If explicit model, bypass routing
+	if body.Model != "auto" && body.Model != "" {
+		if err := s.proxyAnthropic(w, r, bodyBytes, body.Model, body.Stream); err != nil {
+			writeError(w, http.StatusBadGateway, err.Error())
+		}
+		return
+	}
+
+	// Route through pipeline
+	req := &pipeline.Request{
+		Model:    "auto",
+		Messages: msgs,
+		Stream:   body.Stream,
+	}
+	result, err := s.pipeline.Execute(r.Context(), req)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	w.Header().Set("X-Aperture-Model", result.Decision.Model)
+	w.Header().Set("X-Aperture-Provider", result.Decision.Provider)
+	w.Header().Set("X-Aperture-Reason", result.Decision.Reason)
+
+	if err := s.proxyAnthropic(w, r, bodyBytes, result.Decision.Model, body.Stream); err != nil {
+		writeError(w, http.StatusBadGateway, err.Error())
+	}
+}
+
+func (s *Server) proxyAnthropic(w http.ResponseWriter, r *http.Request, bodyBytes []byte, model string, stream bool) error {
+	target := s.getProviderAnthropicURL(model)
+	if target == "" {
+		return fmt.Errorf("no Anthropic-compatible endpoint for model %q", model)
+	}
+
+	// Update model in the request body
+	var reqBody map[string]interface{}
+	json.Unmarshal(bodyBytes, &reqBody)
+	reqBody["model"] = model
+	modified, _ := json.Marshal(reqBody)
+
+	ctx, cancel := context.WithTimeout(r.Context(), s.cfg.Server.WriteTimeout)
+	defer cancel()
+
+	proxyReq, err := http.NewRequestWithContext(ctx, http.MethodPost, target, bytes.NewReader(modified))
+	if err != nil {
+		return err
+	}
+	proxyReq.Header.Set("Content-Type", "application/json")
+	proxyReq.Header.Set("Accept", r.Header.Get("Accept"))
+	if key := r.Header.Get("x-api-key"); key != "" {
+		proxyReq.Header.Set("x-api-key", key)
+	}
+	if key := r.Header.Get("Authorization"); key != "" {
+		proxyReq.Header.Set("Authorization", key)
+	}
+	proxyReq.Header.Set("anthropic-version", "2023-06-01")
+
+	client := &http.Client{Timeout: s.cfg.Server.WriteTimeout}
+	resp, err := client.Do(proxyReq)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	for k, v := range resp.Header {
+		for _, vv := range v {
+			w.Header().Add(k, vv)
+		}
+	}
+	w.WriteHeader(resp.StatusCode)
+
+	if stream {
+		scanner := bufio.NewScanner(resp.Body)
+		flusher, _ := w.(http.Flusher)
+		for scanner.Scan() {
+			line := scanner.Bytes()
+			if _, err := w.Write(append(line, '\n')); err != nil {
+				return nil
+			}
+			if flusher != nil {
+				flusher.Flush()
+			}
+		}
+		return nil
+	}
+
+	io.Copy(w, resp.Body)
+	return nil
+}
+
+func (s *Server) getProviderAnthropicURL(model string) string {
+	for _, p := range s.registry.List() {
+		models, _ := p.ListModels(context.Background())
+		for _, m := range models {
+			if m.ID == model {
+				switch p.ID() {
+				case "deepseek":
+					return "https://api.deepseek.com/anthropic/v1/messages"
+				case "anthropic":
+					return "https://api.anthropic.com/v1/messages"
+				default:
+					return "" // only deepseek and anthropic support this format
+				}
+			}
+		}
+	}
+	return ""
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
