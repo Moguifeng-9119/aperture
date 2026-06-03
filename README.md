@@ -93,6 +93,7 @@ curl -sI http://localhost:8080/v1/chat/completions \
 | **Go install** | `go install github.com/Moguifeng-9119/aperture@latest` |
 | **Binary** | Download from [releases](https://github.com/Moguifeng-9119/aperture/releases/latest) |
 | **Docker Compose** | `docker compose up -d` (includes Ollama for local models) |
+| **Helm** | `helm install aperture ./deploy/helm/aperture` |
 | **Homebrew** | `brew install Moguifeng-9119/tap/aperture` |
 
 ---
@@ -114,7 +115,10 @@ All with streaming (SSE) support. Add new providers by implementing a single Go 
 | **Graceful shutdown** | In-flight requests complete before server stops |
 | **Single binary** | No Node.js, no Python, no Docker required |
 | **Prometheus metrics** | `/metrics` endpoint for Grafana & alerting |
+| **Structured errors** | Typed error codes with HTTP status mapping |
+| **Distributed tracing** | OpenTelemetry-style span hierarchy per pipeline stage |
 | **Docker image** | `docker run -p 8080:8080 -v ./config.yaml:/app/config.yaml aperture` |
+| **Helm chart** | `helm install aperture ./deploy/helm/aperture` |
 
 ### Observability & analytics
 
@@ -207,13 +211,13 @@ make docker-build # build Docker image
 
 | Done | Next |
 |------|------|
-| Core proxy + OpenAI adapter | OpenTelemetry tracing |
-| 4 providers + rule routing + streaming | Structured error codes |
-| Embeddings + cost analytics + SQLite | Helm chart + load testing |
-| Dashboard + admin API + Prometheus | Token-aware cost estimation |
-| Fallback/retry + rate limiter + Docker Compose | Multi-tenancy + caching |
-| Real embeddings (OpenAI) + A/B testing | Plugin system (WASM) |
-| Multi-platform releases + CI | |
+| Core proxy + OpenAI adapter | Token-aware cost estimation |
+| 4 providers + rule routing + streaming | Multi-tenancy + caching |
+| Embeddings + cost analytics + SQLite | Load testing suite (k6) |
+| Dashboard + admin API + Prometheus | ONNX model quality metrics |
+| Fallback/retry + rate limiter + Docker Compose | Plugin system (WASM) |
+| Real embeddings (OpenAI) + A/B testing | |
+| Structured errors + tracing + Helm chart | |
 
 ---
 
