@@ -66,6 +66,8 @@ Every decision is **explained** in response headers. You can trust it — or ove
 
 ## 🚀 Quick Start
 
+> 📖 **完整配置教程**：[docs/guide.md](docs/guide.md) — 覆盖所有模型接入、多模型混合路由、SDK 集成、Dashboard 使用
+
 ```bash
 git clone https://github.com/Moguifeng-9119/aperture.git && cd aperture
 make build
@@ -118,7 +120,7 @@ curl -sI localhost:8080/v1/chat/completions -d '{"model":"auto","messages":[{"ro
 | Category | Spec |
 |----------|------|
 | **Language** | Go 1.25 — single binary, no runtime dependencies |
-| **Providers** | OpenAI · Anthropic · Groq · Ollama · DeepSeek V4 · Qwen · Kimi · GLM · MiniMax · MiMo · [配置指南 →](docs/deepseek-guide.md) |
+| **Providers** | OpenAI · Anthropic · Groq · Ollama · DeepSeek V4 · Qwen · Kimi · GLM · MiniMax · MiMo |
 | **Routing** | 3-tier: Rules (regex/keyword/token) → Embeddings (OpenAI API) → ML (ONNX) |
 | **Storage** | SQLite (WAL mode) — embedded, zero ops |
 | **Dashboard** | HTMX + Alpine.js + Chart.js — embedded in binary |
