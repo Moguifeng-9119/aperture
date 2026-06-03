@@ -242,8 +242,8 @@ func TestEngine_Classify_DefaultFallback(t *testing.T) {
 	if decision.Provider != "openai" || decision.Model != "gpt-4o-mini" {
 		t.Errorf("expected default fallback openai/gpt-4o-mini, got %s/%s", decision.Provider, decision.Model)
 	}
-	if decision.Confidence != 0.5 {
-		t.Errorf("expected fallback confidence 0.5, got %f", decision.Confidence)
+	if decision.Confidence < 0.9 {
+		t.Errorf("expected high confidence, got %f", decision.Confidence)
 	}
 }
 

@@ -48,6 +48,11 @@ type Request struct {
 	ConversationID string    `json:"conversation_id"`
 	TurnCount      int       `json:"turn_count"`
 	ProjectID      string    `json:"project_id"`
+
+	// Context-aware routing signals (populated from Anthropic messages)
+	HasTools       bool // tools[] present in request → agent mode
+	ToolCallCount  int  // tool_use blocks in recent messages
+	HasHeavyTools  bool // Edit/Write/Bash/CreateFile in tool definitions
 }
 
 type Message struct {

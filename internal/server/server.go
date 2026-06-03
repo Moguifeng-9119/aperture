@@ -250,9 +250,10 @@ func (s *Server) handleAnthropicMessages(w http.ResponseWriter, r *http.Request)
 			Role    string          `json:"role"`
 			Content json.RawMessage `json:"content"`
 		} `json:"messages"`
-		Stream      bool    `json:"stream"`
-		MaxTokens   int     `json:"max_tokens"`
-		Temperature *float64 `json:"temperature,omitempty"`
+		Stream      bool            `json:"stream"`
+		MaxTokens   int             `json:"max_tokens"`
+		Temperature *float64        `json:"temperature,omitempty"`
+		Tools       json.RawMessage `json:"tools,omitempty"`
 	}
 	if err := json.Unmarshal(bodyBytes, &body); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body")
@@ -264,24 +265,29 @@ func (s *Server) handleAnthropicMessages(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	// Extract text for routing (handles both string and array content formats)
+	// Parse messages: extract text + count tool_use blocks
 	var msgs []provider.Message
+	toolCallCount := 0
+	heavyTools := []string{"Edit", "Write", "Bash", "CreateFile", "delete_files", "replace_in_file", "write_to_file", "execute_command"}
+
 	for _, m := range body.Messages {
 		text := ""
-		// Try as string first (simple format)
 		var strContent string
 		if json.Unmarshal(m.Content, &strContent) == nil {
 			text = strContent
 		} else {
-			// Try as content block array
 			var blocks []struct {
 				Type string `json:"type"`
 				Text string `json:"text"`
+				Name string `json:"name"`
 			}
 			if json.Unmarshal(m.Content, &blocks) == nil {
 				for _, b := range blocks {
-					if b.Type == "text" {
+					switch b.Type {
+					case "text":
 						text += b.Text
+					case "tool_use":
+						toolCallCount++
 					}
 				}
 			}
@@ -291,12 +297,34 @@ func (s *Server) handleAnthropicMessages(w http.ResponseWriter, r *http.Request)
 		}
 	}
 
-	// Always route — ignore Claude's model preference, let Aperture decide
-	_ = body.Model
+	// Detect heavy tools from tool definitions
+	hasTools := len(body.Tools) > 0
+	hasHeavyTools := false
+	if hasTools {
+		var tools []struct {
+			Name string `json:"name"`
+		}
+		if json.Unmarshal(body.Tools, &tools) == nil {
+			for _, t := range tools {
+				for _, h := range heavyTools {
+					if t.Name == h {
+						hasHeavyTools = true
+						break
+					}
+				}
+				if hasHeavyTools {
+					break
+				}
+			}
+		}
+	}
 
-	// Route only — classify without dispatching (proxy handles the actual API call)
+	// Build routing request with context signals
 	stratReq := &strategy.Request{
-		Messages: make([]strategy.Message, len(msgs)),
+		Messages:      make([]strategy.Message, len(msgs)),
+		HasTools:      hasTools,
+		ToolCallCount: toolCallCount,
+		HasHeavyTools: hasHeavyTools,
 	}
 	for i, m := range msgs {
 		stratReq.Messages[i] = strategy.Message{Role: m.Role, Content: m.Content}
