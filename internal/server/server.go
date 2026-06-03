@@ -239,11 +239,8 @@ func (s *Server) handleAnthropicMessages(w http.ResponseWriter, r *http.Request)
 	var body struct {
 		Model    string `json:"model"`
 		Messages []struct {
-			Role    string `json:"role"`
-			Content []struct {
-				Type string `json:"type"`
-				Text string `json:"text"`
-			} `json:"content"`
+			Role    string          `json:"role"`
+			Content json.RawMessage `json:"content"`
 		} `json:"messages"`
 		Stream      bool    `json:"stream"`
 		MaxTokens   int     `json:"max_tokens"`
@@ -259,16 +256,31 @@ func (s *Server) handleAnthropicMessages(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	// Extract text for routing
+	// Extract text for routing (handles both string and array content formats)
 	var msgs []provider.Message
 	for _, m := range body.Messages {
 		text := ""
-		for _, c := range m.Content {
-			if c.Type == "text" {
-				text += c.Text
+		// Try as string first (simple format)
+		var strContent string
+		if json.Unmarshal(m.Content, &strContent) == nil {
+			text = strContent
+		} else {
+			// Try as content block array
+			var blocks []struct {
+				Type string `json:"type"`
+				Text string `json:"text"`
+			}
+			if json.Unmarshal(m.Content, &blocks) == nil {
+				for _, b := range blocks {
+					if b.Type == "text" {
+						text += b.Text
+					}
+				}
 			}
 		}
-		msgs = append(msgs, provider.Message{Role: m.Role, Content: text})
+		if text != "" {
+			msgs = append(msgs, provider.Message{Role: m.Role, Content: text})
+		}
 	}
 
 	// Always route — ignore Claude's model preference, let Aperture decide
