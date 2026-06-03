@@ -8,6 +8,7 @@
 [![Release](https://img.shields.io/github/v/release/Moguifeng-9119/aperture?color=6366f1)](https://github.com/Moguifeng-9119/aperture/releases)
 [![Go](https://img.shields.io/badge/Go-1.25-00ADD8?logo=go)](https://go.dev)
 [![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
+[![中文文档](https://img.shields.io/badge/README-中文-red)](README_CN.md)
 
 *Route every request to the right model. Save 40–70% on API costs. Zero code changes.*
 
