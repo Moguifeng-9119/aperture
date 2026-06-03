@@ -329,15 +329,19 @@ func (s *Server) handleAnthropicMessages(w http.ResponseWriter, r *http.Request)
 	for i, m := range msgs {
 		stratReq.Messages[i] = strategy.Message{Role: m.Role, Content: m.Content}
 	}
+
+	// Route: classify to determine target model
+	var routeDecision *strategy.Decision
 	targetModel := "deepseek-v4-flash"
 	targetProvider := "deepseek"
 	reason := "default"
 	if s.apertureRouter != nil {
 		decision, err := s.apertureRouter.Classify(r.Context(), stratReq)
 		if err == nil && decision != nil {
-			targetModel = decision.Model
-			targetProvider = decision.Provider
-			reason = decision.Reason
+			routeDecision = decision
+			targetModel = routeDecision.Model
+			targetProvider = routeDecision.Provider
+			reason = routeDecision.Reason
 		}
 	}
 
@@ -345,22 +349,34 @@ func (s *Server) handleAnthropicMessages(w http.ResponseWriter, r *http.Request)
 	w.Header().Set("X-Aperture-Provider", targetProvider)
 	w.Header().Set("X-Aperture-Reason", reason)
 
+	start := time.Now()
 	tokensIn, tokensOut := s.proxyAnthropic(w, r, bodyBytes, targetModel, body.Stream)
-	if s.store != nil && (tokensIn > 0 || tokensOut > 0) {
+	latencyMs := time.Since(start).Milliseconds()
+
+	if s.store != nil {
 		costUSD := s.calculateModelCost(targetModel, tokensIn, tokensOut)
+		savingUSD := s.calculateModelSaving(targetModel, tokensIn, tokensOut)
+
+		complexity := "auto"
+		if routeDecision != nil {
+			complexity = routeDecision.Complexity.String()
+		}
+
 		s.store.RecordDecision(&store.RoutingDecision{
 			Timestamp:  time.Now(),
 			RequestID:  fmt.Sprintf("req_%d", time.Now().UnixNano()),
-			Strategy:    "rule",
-			Complexity:  "auto",
-			Confidence:  1.0,
-			Model:       targetModel,
-			Provider:    targetProvider,
-			Reason:      reason,
-			TokensIn:    tokensIn,
-			TokensOut:   tokensOut,
-			CostUSD:     costUSD,
-			HTTPStatus:  200,
+			Strategy:   "rule",
+			Complexity: complexity,
+			Confidence: 1.0,
+			Model:      targetModel,
+			Provider:   targetProvider,
+			Reason:     reason,
+			TokensIn:   tokensIn,
+			TokensOut:  tokensOut,
+			CostUSD:    costUSD,
+			SavingUSD:  savingUSD,
+			LatencyMs:  latencyMs,
+			HTTPStatus: 200,
 		})
 	}
 }
@@ -439,6 +455,34 @@ func (s *Server) calculateModelCost(model string, tokensIn, tokensOut int) float
 				return float64(tokensIn)/1000*m.CostPer1KInput + float64(tokensOut)/1000*m.CostPer1KOutput
 			}
 		}
+	}
+	return 0
+}
+
+// calculateModelSaving computes how much we saved vs routing everything to the most expensive model.
+func (s *Server) calculateModelSaving(model string, tokensIn, tokensOut int) float64 {
+	actualCost := s.calculateModelCost(model, tokensIn, tokensOut)
+	if actualCost == 0 {
+		return 0
+	}
+
+	// Find the most expensive model across all providers
+	var mostExpensiveCost float64
+	for _, p := range s.registry.List() {
+		models, _ := p.ListModels(context.Background())
+		for _, m := range models {
+			if m.CostPer1KInput <= 0 && m.CostPer1KOutput <= 0 {
+				continue
+			}
+			baselineCost := float64(tokensIn)/1000*m.CostPer1KInput + float64(tokensOut)/1000*m.CostPer1KOutput
+			if baselineCost > mostExpensiveCost {
+				mostExpensiveCost = baselineCost
+			}
+		}
+	}
+
+	if mostExpensiveCost > actualCost {
+		return mostExpensiveCost - actualCost
 	}
 	return 0
 }

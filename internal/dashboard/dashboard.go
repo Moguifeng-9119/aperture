@@ -133,15 +133,13 @@ func (d *Dashboard) handleOverviewData(w http.ResponseWriter, r *http.Request) {
 	totalCost := 0.0
 	totalSaving := 0.0
 	savingPct := 0.0
-	avgLat := 0.0
+
 	if summary != nil {
 		totalReq = summary.TotalRequests
 		totalCost = summary.TotalCostUSD
 		totalSaving = summary.TotalSavingUSD
 		savingPct = summary.SavingPercent
-		avgLat = summary.AvgLatencyMs
 	}
-
 	modelRows := ""
 	if summary != nil {
 		for _, mb := range summary.ByModel {
@@ -154,7 +152,6 @@ func (d *Dashboard) handleOverviewData(w http.ResponseWriter, r *http.Request) {
   <div class="stat"><div class="label">Requests (24h)</div><div class="value" style="color:var(--accent2)">%d</div></div>
   <div class="stat"><div class="label">Cost Today</div><div class="value" style="color:var(--yellow)">$%.4f</div></div>
   <div class="stat"><div class="label">Saved</div><div class="value" style="color:var(--green)">$%.4f</div><div class="sub">%.1f%% savings</div></div>
-  <div class="stat"><div class="label">Avg Latency</div><div class="value">%.0fms</div></div>
 </div>
 <div style="margin-bottom:16px">%s</div>
 <div class="charts">
@@ -173,7 +170,7 @@ if(labels.length===0){labels=['no data'];counts=[1];clabels=['no data'];ccosts=[
 new Chart(mc,{type:'bar',data:{labels:labels,datasets:[{label:'Requests',data:counts,backgroundColor:'#818cf8',borderRadius:4}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,grid:{color:'#1e1e2a'},ticks:{color:'#8888a0'}},x:{grid:{display:false},ticks:{color:'#8888a0'}}}}});
 new Chart(cc,{type:'doughnut',data:{labels:clabels,datasets:[{data:ccosts,backgroundColor:['#818cf8','#22d3ee','#34d399','#fbbf24','#f87171'],borderWidth:0}]},options:{responsive:true,plugins:{legend:{position:'bottom',labels:{color:'#8888a0',padding:12,font:{size:11}}}}}});
 })();
-</script>`, totalReq, totalCost, totalSaving, savingPct, avgLat, providerStatuses, buildModelTable(modelRows), summaryJSON(summary))
+</script>`, totalReq, totalCost, totalSaving, savingPct, providerStatuses, buildModelTable(modelRows), summaryJSON(summary))
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Write([]byte(html))
@@ -279,13 +276,13 @@ func (d *Dashboard) handleLogData(w http.ResponseWriter, r *http.Request) {
 
 		rows += fmt.Sprintf(`<tr class="log-table"><td>%s</td><td>%s/%s</td><td><span class="badge %s">%s</span></td><td>%d/%d</td><td>$%.5f</td><td>%dms</td><td>%s</td></tr>`,
 			dec.Timestamp.Format("15:04:05"), dec.Provider, dec.Model, badgeClass, dec.Complexity,
-			dec.TokensIn, dec.TokensOut, dec.CostUSD, dec.LatencyMs, status)
+			dec.TokensIn, dec.TokensOut, dec.CostUSD, status)
 	}
 
 	html := fmt.Sprintf(`<h2>Request Log <span class="live-dot" style="margin-left:8px"></span></h2>
 <div style="margin-bottom:16px;color:var(--muted);font-size:13px">Showing last 50 of %d requests (24h)</div>
 <div class="chart-box">
-<table><tr><th>Time</th><th>Model</th><th>Complexity</th><th>Tokens</th><th>Cost</th><th>Latency</th><th>Status</th></tr>%s</table>
+<table><tr><th>Time</th><th>Model</th><th>Complexity</th><th>Tokens</th><th>Cost</th><th>Status</th></tr>%s</table>
 </div>
 <div hx-ext="sse" sse-connect="/dashboard/sse" sse-swap="new-request" hx-swap="afterbegin" hx-target="tbody"></div>`, total, rows)
 
