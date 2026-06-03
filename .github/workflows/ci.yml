@@ -19,9 +19,7 @@ jobs:
         with:
           go-version: ${{ matrix.go }}
 
-      - run: go test -race -coverprofile=coverage.out ./...
-
-      - run: go tool cover -func=coverage.out
+      - run: go test -cover ./...
 
   lint:
     runs-on: ubuntu-latest
