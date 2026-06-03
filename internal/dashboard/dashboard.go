@@ -448,6 +448,12 @@ input:focus,select:focus{outline:none;border-color:var(--accent)}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
 </style>
 </head>
+<script>
+document.body.addEventListener('htmx:configRequest', function(evt) {
+  var key = localStorage.getItem('adminKey') || '';
+  if (key) evt.detail.headers['X-Admin-Key'] = key;
+});
+</script>
 <body x-data="{page:'overview',adminKey:localStorage.getItem('adminKey')||''}">
 <aside class="sidebar">
   <h1>Aperture<span>.</span></h1>
