@@ -271,13 +271,8 @@ func (s *Server) handleAnthropicMessages(w http.ResponseWriter, r *http.Request)
 		msgs = append(msgs, provider.Message{Role: m.Role, Content: text})
 	}
 
-	// If explicit model, bypass routing
-	if body.Model != "auto" && body.Model != "" {
-		if err := s.proxyAnthropic(w, r, bodyBytes, body.Model, body.Stream); err != nil {
-			writeError(w, http.StatusBadGateway, err.Error())
-		}
-		return
-	}
+	// Always route — ignore Claude's model preference, let Aperture decide
+	_ = body.Model
 
 	// Route through pipeline
 	req := &pipeline.Request{
