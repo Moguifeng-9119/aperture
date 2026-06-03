@@ -1,180 +1,144 @@
-<h1 align="center">Aperture</h1>
+<div align="center">
 
-<p align="center">
-  <strong>One gateway for all your LLMs.</strong><br>
-  Route every request to the right model.<br>
-  Save 40–70% on API costs. Zero code changes.
-</p>
+# Aperture
 
-<p align="center">
-  <a href="https://github.com/Moguifeng-9119/aperture/actions/workflows/ci.yml"><img src="https://github.com/Moguifeng-9119/aperture/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <a href="https://github.com/Moguifeng-9119/aperture/releases"><img src="https://img.shields.io/github/v/release/Moguifeng-9119/aperture" alt="Release"></a>
-  <a href="https://pkg.go.dev/github.com/Moguifeng-9119/aperture"><img src="https://img.shields.io/badge/go-reference-00ADD8?logo=go" alt="Go Reference"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="License"></a>
-</p>
+**Intelligent Multi-Model LLM Routing Gateway**
 
----
+[![CI](https://github.com/Moguifeng-9119/aperture/actions/workflows/ci.yml/badge.svg)](https://github.com/Moguifeng-9119/aperture/actions)
+[![Release](https://img.shields.io/github/v/release/Moguifeng-9119/aperture?color=6366f1)](https://github.com/Moguifeng-9119/aperture/releases)
+[![Go](https://img.shields.io/badge/Go-1.25-00ADD8?logo=go)](https://go.dev)
+[![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
 
-## What is Aperture?
+*Route every request to the right model. Save 40–70% on API costs. Zero code changes.*
 
-Aperture is an **OpenAI-compatible LLM gateway** that analyzes each request and routes it to the optimal model. It replaces your single-model API call with **intelligent multi-model routing** — without changing your application code.
-
-```
-Before:  Every request → GPT-4o                    ($10.00 / 1M tokens)
-After:   "hello" → Llama 3.1 8B                   ($0.05 / 1M tokens)
-         "write a function" → GPT-4o               ($10.00 / 1M tokens)
-         "explain this code" → Claude 3 Haiku      ($0.25 / 1M tokens)
-         ─────────────────────────────────────────────────────────
-         Average savings: 40–70%
-```
-
-Every routing decision includes an `X-Aperture-Reason` header so you can see exactly **why** a model was chosen.
-
-### Three tiers, one gateway
-
-| Tier | How it works | Latency | Accuracy | Setup |
-|:----:|-------------|:-----:|:--------:|--------|
-| **1** | Rules — keywords, regex, token count | < 0.1ms | ~80% | None — built in |
-| **2** | Embeddings — OpenAI text-embedding-3-small | ~200ms | ~90% | Set `OPENAI_API_KEY` |
-| **3** | ML — train your own ONNX classifier | < 1ms | ~95% | Export data → train → deploy |
-
-Tiers 2 and 3 are optional. Tiers cascade: if Tier 1 isn't confident enough, Tier 2 tries. Still not sure? Tier 3 has the final say.
+</div>
 
 ---
 
-## Quick Start
+<h3 align="center">💡 The Problem</h3>
+
+Your app sends **every request** to the same expensive model. "Hello" costs the same as "Write a production-grade auth system in Rust."
+
+<h3 align="center">🔆 Aperture's Solution</h3>
+
+Aperture sits between your app and LLM providers, analyzes each request, and routes it to the **optimal model**:
+
+```
+"Hello!"           →  Groq Llama 3.1 8B       ($0.05 / 1M tokens)
+"Explain this SQL" →  Claude 3 Haiku         ($0.25 / 1M tokens)
+"Write an API"     →  GPT-4o                 ($10.00 / 1M tokens)
+```
+
+Every decision is **explained** in response headers. You can trust it — or override it.
+
+<div align="center">
+
+| Tier 1: Rules | Tier 2: Embeddings | Tier 3: ML |
+|:---:|:---:|:---:|
+| `< 0.1ms` | `~200ms` | `< 1ms` |
+| ~80% accuracy | ~90% accuracy | ~95% accuracy |
+| Built in, zero config | Set `OPENAI_API_KEY` | Train your own ONNX model |
+
+*Tiers cascade. Start with Tier 1. Add 2 and 3 when you need more accuracy.*
+
+</div>
+
+---
+
+## 🚀 Quick Start
 
 ```bash
-# Clone, build, run
 git clone https://github.com/Moguifeng-9119/aperture.git && cd aperture
-make build && cp config.example.yaml config.yaml
-
-# Set your API keys
+make build
+cp config.example.yaml config.yaml
 export OPENAI_API_KEY="sk-..."
-export APERTURE_ADMIN_KEY="choose-a-password"
-
-# Start the gateway
 ./aperture
-# → Listening on :8080 · Dashboard at /dashboard · Metrics at /metrics
 ```
 
-**Try auto-routing:**
-
 ```bash
-# A greeting — routes to a cheap model
-curl -s http://localhost:8080/v1/chat/completions \
+curl http://localhost:8080/v1/chat/completions \
   -H "Content-Type: application/json" \
-  -d '{"model":"auto","messages":[{"role":"user","content":"Hello!"}]}'
-
-# A code request — routes to a powerful model
-curl -s http://localhost:8080/v1/chat/completions \
-  -H "Content-Type: application/json" \
-  -d '{"model":"auto","messages":[{"role":"user","content":"Write a Python function to parse JSON"}]}'
+  -d '{"model":"auto","messages":[{"role":"user","content":"Write a function to parse JSON"}]}'
 ```
 
-**See what model handled your request:**
+Check which model was chosen:
 
 ```bash
-curl -sI http://localhost:8080/v1/chat/completions \
-  -H "Content-Type: application/json" \
-  -d '{"model":"auto","messages":[{"role":"user","content":"Hello!"}]}' \
-  | grep X-Aperture
+curl -sI localhost:8080/v1/chat/completions -d '{"model":"auto","messages":[{"role":"user","content":"Hello!"}]}' | grep X-Aperture
 
 # X-Aperture-Model: llama-3.1-8b-instant
 # X-Aperture-Provider: groq
 # X-Aperture-Reason: rule:greeting matched → trivial → groq/llama-3.1-8b-instant
-# X-Aperture-Saving-USD: 0.009850
 ```
 
-### Other install options
+<div align="center">
 
-| Method | Command |
-|--------|---------|
-| **Go install** | `go install github.com/Moguifeng-9119/aperture@latest` |
-| **Binary** | Download from [releases](https://github.com/Moguifeng-9119/aperture/releases/latest) |
-| **Docker Compose** | `docker compose up -d` (includes Ollama for local models) |
+| Install | Command |
+|---------|---------|
+| **Go** | `go install github.com/Moguifeng-9119/aperture@latest` |
+| **Docker** | `docker compose up -d` |
 | **Helm** | `helm install aperture ./deploy/helm/aperture` |
-| **Homebrew** | `brew install Moguifeng-9119/tap/aperture` |
+| **Binary** | [Latest release](https://github.com/Moguifeng-9119/aperture/releases/latest) |
+
+</div>
 
 ---
 
-## Features
+<div align="center">
+  <a href="https://skillicons.dev">
+    <img src="https://skillicons.dev/icons?i=go,docker,kubernetes,prometheus,sqlite,htmx,yaml&theme=light" alt="Tech Stack" />
+  </a>
+</div>
 
-### Supported providers
+## 🔧 Tech Stack & Features
 
-OpenAI · Anthropic · Groq · Ollama
+| Category | Spec |
+|----------|------|
+| **Language** | Go 1.25 — single binary, no runtime dependencies |
+| **Providers** | OpenAI · Anthropic · Groq · Ollama (all with SSE streaming) |
+| **Routing** | 3-tier: Rules (regex/keyword/token) → Embeddings (OpenAI API) → ML (ONNX) |
+| **Storage** | SQLite (WAL mode) — embedded, zero ops |
+| **Dashboard** | HTMX + Alpine.js + Chart.js — embedded in binary |
+| **Observability** | Prometheus `/metrics` · Structured error codes · Span tracing |
+| **Deployment** | Docker · Docker Compose · Helm · goreleaser (6 platforms) |
+| **API** | OpenAI-compatible `/v1/chat/completions` — drop-in replacement |
 
-All with streaming (SSE) support. Add new providers by implementing a single Go interface.
-
-### Production ready
-
-| Feature | Description |
-|---------|-------------|
-| **Fallback chain** | Primary provider fails → auto retries with backup models |
-| **Rate limiting** | Per-API-key throttling, configurable RPM |
-| **Graceful shutdown** | In-flight requests complete before server stops |
-| **Single binary** | No Node.js, no Python, no Docker required |
-| **Prometheus metrics** | `/metrics` endpoint for Grafana & alerting |
-| **Structured errors** | Typed error codes with HTTP status mapping |
-| **Distributed tracing** | OpenTelemetry-style span hierarchy per pipeline stage |
-| **Docker image** | `docker run -p 8080:8080 -v ./config.yaml:/app/config.yaml aperture` |
-| **Helm chart** | `helm install aperture ./deploy/helm/aperture` |
-
-### Observability & analytics
-
-| Feature | Description |
-|---------|-------------|
-| **Explainable routing** | Every response includes `X-Aperture-Model`, `X-Aperture-Provider`, `X-Aperture-Reason`, `X-Aperture-Saving-USD` |
-| **Cost dashboard** | Real-time per-model cost tracking at `/dashboard` |
-| **Admin API** | Full CRUD for API keys, routing test endpoint, analytics queries |
-
-### ML & experimentation
-
-| Feature | Description |
-|---------|-------------|
-| **A/B testing** | Compare two routing strategies; view agreement stats at `/admin/v1/ab-test/stats` |
-| **Training data export** | `GET /admin/v1/analytics/export` returns JSONL for model training |
-| **Dry-run routing** | `POST /admin/v1/routing/test` shows which model would be selected |
-| **Custom ML classifier** | Export data, train with `tools/train_model.py`, deploy as Tier 3 |
+<div align="center">
+  <a href="https://github.com/Jurredr/github-widgetbox">
+    <img src="https://github-widgetbox.vercel.app/api/skills?tools=git,docker,kubernetes,nginx,redis,aws,vercel&includeNames=true&theme=nautilus" alt="GitHub WidgetBox" />
+  </a>
+</div>
 
 ---
 
-## API
+## 📖 API
 
-### OpenAI-compatible endpoints
-
+### OpenAI-compatible
 ```
 POST   /v1/chat/completions    → stream=true supported
-GET    /v1/models               → lists all models + "auto"
-GET    /health                  → per-provider health status
+GET    /v1/models               → all models + "auto"
+GET    /health                  → per-provider health
 ```
 
-### Admin API (requires `X-Admin-Key` header)
-
+### Admin (requires `X-Admin-Key`)
 ```
-GET    /admin/v1/health
-GET    /admin/v1/analytics/summary       ?from=2024-01-01&to=2024-01-31
-GET    /admin/v1/analytics/requests      ?page=1&per_page=50
+GET    /admin/v1/analytics/summary       ?from=&to=
+GET    /admin/v1/analytics/requests      ?page=&per_page=
 GET    /admin/v1/analytics/export        → JSONL training data
 POST   /admin/v1/routing/test            → { "messages": [...] }
 GET    /admin/v1/ab-test/stats           → A/B agreement rate
-GET    /admin/v1/keys                    → list API keys
-POST   /admin/v1/keys                    → { "name": "my-key" }
-DELETE /admin/v1/keys/{id}
+CRUD   /admin/v1/keys                    → API key management
 ```
 
 ### Observability
-
 ```
-GET    /metrics                 → Prometheus text format
+GET    /metrics                 → Prometheus format
 GET    /dashboard               → built-in analytics UI
 ```
 
 ---
 
-## Configuration
-
-The shortest working config:
+## ⚙️ Config
 
 ```yaml
 server:
@@ -190,11 +154,43 @@ routing:
   default_provider: openai
 ```
 
-Full reference including fallback chains, custom routing rules, rate limits, per-model pricing, and embedding settings: **[config.example.yaml](config.example.yaml)**.
+Full reference: **[config.example.yaml](config.example.yaml)** — fallback chains, custom rules, rate limits, per-model pricing, embedding settings.
 
 ---
 
-## Development
+## 📊 Project Status
+
+<div align="center">
+
+| Metric | Value |
+|--------|-------|
+| **Test packages** | 15 |
+| **Providers covered** | 4/4 |
+| **CI** | test · lint · build · release |
+| **Platforms** | linux (amd64/arm64) · darwin (amd64/arm64) · windows (amd64/arm64) |
+
+</div>
+
+## 🗺️ Roadmap
+
+<div align="center">
+
+| ✅ Done | ⬜ Next |
+|---------|---------|
+| Core proxy + OpenAI adapter | Token-aware cost estimation |
+| 4 providers + rule routing + streaming | Multi-tenancy + caching |
+| Embeddings + analytics + SQLite | Load testing suite (k6) |
+| Dashboard + admin API + Prometheus | ONNX model quality metrics |
+| Fallback/retry + rate limiter + Docker Compose | Plugin system (WASM) |
+| Real embeddings (OpenAI) + A/B testing | |
+| Structured errors + tracing + Helm chart | |
+| CI/CD + goreleaser + multi-platform releases | |
+
+</div>
+
+---
+
+## 🛠️ Development
 
 ```bash
 make build        # → ./aperture
@@ -207,20 +203,8 @@ make docker-build # build Docker image
 
 ---
 
-## Roadmap
+<div align="center">
 
-| Done | Next |
-|------|------|
-| Core proxy + OpenAI adapter | Token-aware cost estimation |
-| 4 providers + rule routing + streaming | Multi-tenancy + caching |
-| Embeddings + cost analytics + SQLite | Load testing suite (k6) |
-| Dashboard + admin API + Prometheus | ONNX model quality metrics |
-| Fallback/retry + rate limiter + Docker Compose | Plugin system (WASM) |
-| Real embeddings (OpenAI) + A/B testing | |
-| Structured errors + tracing + Helm chart | |
+**MIT** · [Moguifeng-9119](https://github.com/Moguifeng-9119)
 
----
-
-## License
-
-MIT © [Moguifeng-9119](https://github.com/Moguifeng-9119)
+</div>
