@@ -1,7 +1,10 @@
 package admin
 
 import (
+	"crypto/subtle"
 	"encoding/json"
+	"io"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"time"
@@ -50,7 +53,7 @@ func (h *Handler) authMiddleware(next http.Handler) http.Handler {
 				key = key[7:]
 			}
 		}
-		if key != h.adminKey {
+		if subtle.ConstantTimeCompare([]byte(key), []byte(h.adminKey)) != 1 {
 			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 			return
 		}
@@ -123,7 +126,7 @@ func (h *Handler) handleRoutingTest(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Messages []strategy.Message `json:"messages"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&req); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
 		return
 	}
@@ -163,7 +166,7 @@ func (h *Handler) handleCreateKey(w http.ResponseWriter, r *http.Request) {
 		Budget    float64 `json:"budget_monthly_usd"`
 	}
 
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&req); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
 		return
 	}
@@ -221,5 +224,7 @@ func parseDateRange(r *http.Request) (time.Time, time.Time) {
 func writeJSON(w http.ResponseWriter, status int, data any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(data)
+	if err := json.NewEncoder(w).Encode(data); err != nil {
+		slog.Error("json encode error", "error", err)
+	}
 }

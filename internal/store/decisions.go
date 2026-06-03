@@ -1,7 +1,6 @@
 package store
 
 import (
-	"encoding/json"
 	"fmt"
 	"time"
 )
@@ -36,13 +35,11 @@ func (s *Store) RecordDecision(d *RoutingDecision) error {
 		d.Timestamp = time.Now()
 	}
 
-	msgsJSON, _ := json.Marshal(d.MessagesJSON)
-
 	_, err := s.db.Exec(`INSERT INTO routing_decisions
 		(timestamp, request_id, project_id, conversation_id, strategy, complexity, confidence, model, provider, reason, messages_json, tokens_in, tokens_out, cost_usd, saving_usd, latency_ms, http_status, error)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		d.Timestamp, d.RequestID, d.ProjectID, d.ConversationID, d.Strategy,
-		d.Complexity, d.Confidence, d.Model, d.Provider, d.Reason, string(msgsJSON),
+		d.Complexity, d.Confidence, d.Model, d.Provider, d.Reason, d.MessagesJSON,
 		d.TokensIn, d.TokensOut, d.CostUSD, d.SavingUSD, d.LatencyMs, d.HTTPStatus, d.Error)
 	if err != nil {
 		return fmt.Errorf("record decision: %w", err)

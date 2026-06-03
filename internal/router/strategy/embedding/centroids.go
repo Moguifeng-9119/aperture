@@ -9,7 +9,7 @@ var defaultVocab = []string{
 	"hello", "hi", "hey", "thanks", "bye", "help",
 	"fix", "debug", "refactor", "bug", "error", "test",
 	"review", "design", "architecture", "system", "api", "database",
-	"optimize", "performance", "refactor", "clean", "improve",
+	"optimize", "performance", "clean", "improve", "restructure",
 	"data", "model", "train", "learn", "predict",
 	"define", "type", "interface", "struct", "module", "package",
 	"contract", "legal", "nda", "agreement", "compliance",

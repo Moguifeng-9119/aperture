@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"time"
 
 	"github.com/2144983846/aperture/internal/admin"
 	"github.com/2144983846/aperture/internal/analytics"
@@ -145,9 +146,15 @@ func main() {
 		signal.Notify(quit, os.Interrupt)
 		<-quit
 		slog.Info("shutting down...")
-		httpServer.Close()
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		if err := httpServer.Shutdown(shutdownCtx); err != nil {
+			slog.Error("server shutdown error", "error", err)
+		}
 		if db != nil {
-			db.Close()
+			if err := db.Close(); err != nil {
+				slog.Error("db close error", "error", err)
+			}
 		}
 	}()
 
@@ -217,29 +224,32 @@ func newProvider(cfg config.ProviderConfig) (provider.Provider, error) {
 	}
 }
 
-func buildRuleEngine(cfg *config.Config) *rules.Engine {
-	complexityMap := make(map[strategy.ComplexityLevel]strategy.RouteTarget)
+func buildComplexityMap(cfg *config.Config, defaultTarget strategy.RouteTarget) map[strategy.ComplexityLevel]strategy.RouteTarget {
+	modelMap := make(map[strategy.ComplexityLevel]strategy.RouteTarget)
 	for levelStr, target := range cfg.Routing.ComplexityMap {
 		level := parseComplexity(levelStr)
-		complexityMap[level] = strategy.RouteTarget{
+		modelMap[level] = strategy.RouteTarget{
 			Provider: target.Provider,
 			Model:    target.Model,
 		}
 	}
-
-	defaultTarget := strategy.RouteTarget{
-		Provider: cfg.Routing.DefaultProvider,
-		Model:    cfg.Routing.DefaultModel,
-	}
-
 	for _, l := range []strategy.ComplexityLevel{
 		strategy.ComplexityTrivial, strategy.ComplexitySimple,
 		strategy.ComplexityModerate, strategy.ComplexityComplex, strategy.ComplexityExpert,
 	} {
-		if _, ok := complexityMap[l]; !ok {
-			complexityMap[l] = defaultTarget
+		if _, ok := modelMap[l]; !ok {
+			modelMap[l] = defaultTarget
 		}
 	}
+	return modelMap
+}
+
+func buildRuleEngine(cfg *config.Config) *rules.Engine {
+	defaultTarget := strategy.RouteTarget{
+		Provider: cfg.Routing.DefaultProvider,
+		Model:    cfg.Routing.DefaultModel,
+	}
+	complexityMap := buildComplexityMap(cfg, defaultTarget)
 
 	allRules := rules.DefaultRules()
 	for _, rc := range cfg.Routing.Rules {
@@ -262,24 +272,7 @@ func buildRuleEngine(cfg *config.Config) *rules.Engine {
 func buildEmbeddingStrategy(cfg *config.Config, defaultTarget strategy.RouteTarget) *embedding.Strategy {
 	centroids := embedding.DefaultCentroids()
 	vocab := embedding.DefaultVocab()
-
-	modelMap := make(map[strategy.ComplexityLevel]strategy.RouteTarget)
-	for levelStr, target := range cfg.Routing.ComplexityMap {
-		level := parseComplexity(levelStr)
-		modelMap[level] = strategy.RouteTarget{
-			Provider: target.Provider,
-			Model:    target.Model,
-		}
-	}
-
-	for _, l := range []strategy.ComplexityLevel{
-		strategy.ComplexityTrivial, strategy.ComplexitySimple,
-		strategy.ComplexityModerate, strategy.ComplexityComplex, strategy.ComplexityExpert,
-	} {
-		if _, ok := modelMap[l]; !ok {
-			modelMap[l] = defaultTarget
-		}
-	}
+	modelMap := buildComplexityMap(cfg, defaultTarget)
 
 	threshold := 0.1
 	for _, sc := range cfg.Routing.Strategies {
@@ -295,23 +288,7 @@ func buildEmbeddingStrategy(cfg *config.Config, defaultTarget strategy.RouteTarg
 }
 
 func buildMLStrategy(cfg *config.Config, defaultTarget strategy.RouteTarget) *ml.Strategy {
-	modelMap := make(map[strategy.ComplexityLevel]strategy.RouteTarget)
-	for levelStr, target := range cfg.Routing.ComplexityMap {
-		level := parseComplexity(levelStr)
-		modelMap[level] = strategy.RouteTarget{
-			Provider: target.Provider,
-			Model:    target.Model,
-		}
-	}
-
-	for _, l := range []strategy.ComplexityLevel{
-		strategy.ComplexityTrivial, strategy.ComplexitySimple,
-		strategy.ComplexityModerate, strategy.ComplexityComplex, strategy.ComplexityExpert,
-	} {
-		if _, ok := modelMap[l]; !ok {
-			modelMap[l] = defaultTarget
-		}
-	}
+	modelMap := buildComplexityMap(cfg, defaultTarget)
 
 	threshold := 0.5
 	modelPath := ""
@@ -322,8 +299,12 @@ func buildMLStrategy(cfg *config.Config, defaultTarget strategy.RouteTarget) *ml
 			}
 			s, err := ml.New(modelPath, modelMap, threshold)
 			if err != nil {
-				slog.Warn("ml strategy init failed, using defaults", "error", err)
-				s, _ = ml.New("", modelMap, threshold)
+				slog.Warn("ml strategy init failed, trying empty path", "error", err)
+				s, err = ml.New("", modelMap, threshold)
+				if err != nil {
+					slog.Error("ml strategy completely failed", "error", err)
+					return nil
+				}
 			}
 			return s
 		}

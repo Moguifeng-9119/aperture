@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/2144983846/aperture/internal/config"
 	"github.com/2144983846/aperture/internal/provider"
@@ -29,7 +30,9 @@ func New(cfg config.ProviderConfig) (*Adapter, error) {
 	baseURL = strings.TrimSuffix(baseURL, "/")
 
 	a := &Adapter{
-		client:  &http.Client{},
+		client: &http.Client{
+			Timeout: 120 * time.Second,
+		},
 		apiKey:  cfg.APIKey,
 		baseURL: baseURL,
 	}
@@ -151,7 +154,10 @@ func (a *Adapter) ListModels(ctx context.Context) ([]provider.ModelInfo, error) 
 
 func (a *Adapter) Health(ctx context.Context) error {
 	url := a.baseURL + "/models"
-	httpReq, _ := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return fmt.Errorf("health check create request: %w", err)
+	}
 	httpReq.Header.Set("Authorization", "Bearer "+a.apiKey)
 
 	resp, err := a.client.Do(httpReq)

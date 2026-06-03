@@ -81,15 +81,15 @@ func (m *Metrics) Handler() http.Handler {
 		fmt.Fprintf(w, "# TYPE aperture_uptime_seconds gauge\n")
 		fmt.Fprintf(w, "aperture_uptime_seconds %.0f\n", time.Since(m.startTime).Seconds())
 
+		fmt.Fprintf(w, "# HELP aperture_requests_by_model Requests by model\n")
+		fmt.Fprintf(w, "# TYPE aperture_requests_by_model counter\n")
 		for model, count := range m.byModel {
-			fmt.Fprintf(w, "# HELP aperture_requests_by_model Requests by model\n")
-			fmt.Fprintf(w, "# TYPE aperture_requests_by_model counter\n")
 			fmt.Fprintf(w, `aperture_requests_by_model{model="%s"} %d`+"\n", model, count)
 		}
 
+		fmt.Fprintf(w, "# HELP aperture_requests_by_strategy Requests by routing strategy\n")
+		fmt.Fprintf(w, "# TYPE aperture_requests_by_strategy counter\n")
 		for strategy, count := range m.byStrategy {
-			fmt.Fprintf(w, "# HELP aperture_requests_by_strategy Requests by routing strategy\n")
-			fmt.Fprintf(w, "# TYPE aperture_requests_by_strategy counter\n")
 			fmt.Fprintf(w, `aperture_requests_by_strategy{strategy="%s"} %d`+"\n", strategy, count)
 		}
 	})
