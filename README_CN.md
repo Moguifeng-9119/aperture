@@ -34,6 +34,8 @@ Aperture 的做法：分析请求内容，自动把"你好"扔给便宜的模型
 
 ## 🚀 5 分钟跑起来
 
+> 📖 **完整配置教程**：[docs/guide.md](docs/guide.md) — 覆盖 DeepSeek/通义千问/Kimi/GLM/MiniMax/MiMo 等国产模型接入
+
 ```bash
 git clone https://github.com/Moguifeng-9119/aperture.git && cd aperture
 make build
@@ -92,7 +94,7 @@ curl -sI localhost:8080/v1/chat/completions \
 
 | 分类 | 说明 |
 |------|------|
-| **提供商** | OpenAI · Anthropic · Groq · Ollama · DeepSeek V4 · 通义千问 · Kimi · 智谱 GLM · MiniMax · 小米 MiMo · [配置教程 →](docs/deepseek-guide.md) |
+| **提供商** | OpenAI · Anthropic · Groq · Ollama · DeepSeek V4 · 通义千问 · Kimi · 智谱 GLM · MiniMax · 小米 MiMo |
 | **路由引擎** | 三层：规则（关键词/正则/token 计数）→ 嵌入（OpenAI API）→ ML（ONNX 自定义模型） |
 | **生产特性** | 失败自动回退链 · 请求重试 · 按 Key 限速 · 优雅退出 · 结构化错误码 |
 | **运维面板** | 内置 Dashboard（HTMX + Alpine.js + Chart.js）· Prometheus `/metrics` |
