@@ -118,7 +118,7 @@ curl -sI localhost:8080/v1/chat/completions -d '{"model":"auto","messages":[{"ro
 | Category | Spec |
 |----------|------|
 | **Language** | Go 1.25 — single binary, no runtime dependencies |
-| **Providers** | OpenAI · Anthropic · Groq · Ollama · DeepSeek · Qwen · Moonshot |
+| **Providers** | OpenAI · Anthropic · Groq · Ollama · DeepSeek V4 · Qwen · Kimi · GLM · MiniMax · MiMo · [配置指南 →](docs/deepseek-guide.md) |
 | **Routing** | 3-tier: Rules (regex/keyword/token) → Embeddings (OpenAI API) → ML (ONNX) |
 | **Storage** | SQLite (WAL mode) — embedded, zero ops |
 | **Dashboard** | HTMX + Alpine.js + Chart.js — embedded in binary |
