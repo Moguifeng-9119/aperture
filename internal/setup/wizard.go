@@ -119,7 +119,7 @@ func (w *Wizard) askProviders() []map[string]interface{} {
 	var providers []map[string]interface{}
 
 	// OpenAI
-	fmt.Println("  [1/4] OpenAI (GPT-4o, GPT-4o-mini)")
+	fmt.Println("  [1/5] OpenAI (GPT-4o, GPT-4o-mini)")
 	apiKey := w.askDefault("    API Key (留空跳过)", os.Getenv("OPENAI_API_KEY"))
 	if apiKey != "" {
 		providers = append(providers, map[string]interface{}{
@@ -138,7 +138,7 @@ func (w *Wizard) askProviders() []map[string]interface{} {
 	fmt.Println()
 
 	// Anthropic
-	fmt.Println("  [2/4] Anthropic (Claude Opus, Sonnet, Haiku)")
+	fmt.Println("  [2/5] Anthropic (Claude Opus, Sonnet, Haiku)")
 	apiKey = w.askDefault("    API Key (留空跳过)", os.Getenv("ANTHROPIC_API_KEY"))
 	if apiKey != "" {
 		providers = append(providers, map[string]interface{}{
@@ -157,7 +157,7 @@ func (w *Wizard) askProviders() []map[string]interface{} {
 	fmt.Println()
 
 	// Groq
-	fmt.Println("  [3/4] Groq (Llama 3.1 高速推理)")
+	fmt.Println("  [3/5] Groq (Llama 3.1 高速推理)")
 	apiKey = w.askDefault("    API Key (留空跳过)", os.Getenv("GROQ_API_KEY"))
 	if apiKey != "" {
 		providers = append(providers, map[string]interface{}{
@@ -175,7 +175,7 @@ func (w *Wizard) askProviders() []map[string]interface{} {
 	fmt.Println()
 
 	// Ollama
-	fmt.Println("  [4/4] Ollama (本地模型 - Qwen, DeepSeek, Llama 等)")
+	fmt.Println("  [4/5] Ollama (本地模型 - Qwen, DeepSeek, Llama 等)")
 	useOllama := w.askDefault("    启用 Ollama? (y/n)", "y")
 	if strings.ToLower(useOllama) == "y" {
 		baseURL := w.askDefault("    Ollama 地址", "http://localhost:11434")
@@ -189,6 +189,66 @@ func (w *Wizard) askProviders() []map[string]interface{} {
 			},
 		})
 		fmt.Println("    ✓ Ollama 已配置")
+	} else {
+		fmt.Println("    - 已跳过")
+	}
+
+	// Domestic Chinese Models
+	fmt.Println("  [5/5] 国产模型 (DeepSeek V4, 通义千问, Moonshot)")
+	useDomestic := w.askDefault("    启用国产模型? (y/n)", "y")
+	if strings.ToLower(useDomestic) == "y" {
+		fmt.Println()
+		fmt.Println("    选择模型:")
+		fmt.Println("      [1] DeepSeek V4 (deepseek-v4-pro + deepseek-v4-flash)")
+		fmt.Println("      [2] 通义千问 Qwen (qwen-plus)")
+		fmt.Println("      [3] Moonshot Kimi (moonshot-v1-8k)")
+		modelChoice := w.askDefault("    选择 (1/2/3)", "1")
+
+		switch modelChoice {
+		case "1":
+			apiKey := w.askDefault("      DeepSeek API Key", os.Getenv("DEEPSEEK_API_KEY"))
+			if apiKey != "" {
+				providers = append(providers, map[string]interface{}{
+					"id":       "deepseek",
+					"type":     "openai",
+					"api_key":  apiKey,
+					"base_url": "https://api.deepseek.com",
+					"models": []map[string]interface{}{
+						{"id": "deepseek-v4-flash", "cost_per_1k_input": 0.00014, "cost_per_1k_output": 0.00028, "max_tokens": 1048576},
+						{"id": "deepseek-v4-pro", "cost_per_1k_input": 0.000435, "cost_per_1k_output": 0.00087, "max_tokens": 1048576},
+					},
+				})
+				fmt.Println("      ✓ DeepSeek V4 已配置")
+			}
+		case "2":
+			apiKey := w.askDefault("      DashScope API Key", os.Getenv("DASHSCOPE_API_KEY"))
+			if apiKey != "" {
+				providers = append(providers, map[string]interface{}{
+					"id":       "qwen",
+					"type":     "openai",
+					"api_key":  apiKey,
+					"base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+					"models": []map[string]interface{}{
+						{"id": "qwen-plus", "cost_per_1k_input": 0.0008, "cost_per_1k_output": 0.002, "max_tokens": 131072},
+					},
+				})
+				fmt.Println("      ✓ 通义千问已配置")
+			}
+		case "3":
+			apiKey := w.askDefault("      Moonshot API Key", os.Getenv("MOONSHOT_API_KEY"))
+			if apiKey != "" {
+				providers = append(providers, map[string]interface{}{
+					"id":       "moonshot",
+					"type":     "openai",
+					"api_key":  apiKey,
+					"base_url": "https://api.moonshot.cn/v1",
+					"models": []map[string]interface{}{
+						{"id": "moonshot-v1-8k", "cost_per_1k_input": 0.012, "cost_per_1k_output": 0.012, "max_tokens": 8192},
+					},
+				})
+				fmt.Println("      ✓ Moonshot 已配置")
+			}
+		}
 	} else {
 		fmt.Println("    - 已跳过")
 	}
@@ -264,36 +324,28 @@ func (w *Wizard) askRouting(providers []map[string]interface{}) map[string]inter
 func (w *Wizard) buildComplexityMap(providers []map[string]interface{}) map[string]interface{} {
 	cm := make(map[string]interface{})
 
-	// Find cheapest provider for trivial
-	openaiModel := ""
-	groqModel := ""
-	anthropicModel := ""
-
+	// Build complexity map from providers: first model = cheap, last model = powerful
 	for _, p := range providers {
 		models := p["models"].([]map[string]interface{})
+		pid := p["id"].(string)
 		if len(models) == 0 {
 			continue
 		}
-		switch p["id"] {
-		case "openai":
-			openaiModel = models[0]["id"].(string)
-		case "groq":
-			groqModel = models[0]["id"].(string)
-		case "anthropic":
-			anthropicModel = models[0]["id"].(string)
+		cheapModel := models[0]["id"].(string)
+		powerModel := cheapModel
+		if len(models) >= 2 {
+			powerModel = models[1]["id"].(string)
 		}
-	}
 
-	if groqModel != "" {
-		cm["trivial"] = map[string]string{"provider": "groq", "model": groqModel}
-	}
-	if anthropicModel != "" {
-		cm["simple"] = map[string]string{"provider": "anthropic", "model": anthropicModel}
-	}
-	if openaiModel != "" {
-		cm["moderate"] = map[string]string{"provider": "openai", "model": openaiModel}
-		cm["complex"] = map[string]string{"provider": "openai", "model": openaiModel}
-		cm["expert"] = map[string]string{"provider": "openai", "model": openaiModel}
+		switch {
+		case pid == "groq", strings.Contains(cheapModel, "flash"), strings.Contains(cheapModel, "mini"):
+			cm["trivial"] = map[string]string{"provider": pid, "model": cheapModel}
+		case pid == "anthropic", strings.Contains(cheapModel, "haiku"):
+			cm["simple"] = map[string]string{"provider": pid, "model": cheapModel}
+		}
+		cm["moderate"] = map[string]string{"provider": pid, "model": cheapModel}
+		cm["complex"] = map[string]string{"provider": pid, "model": powerModel}
+		cm["expert"] = map[string]string{"provider": pid, "model": powerModel}
 	}
 
 	return cm
@@ -355,6 +407,9 @@ func (w *Wizard) testConnections(providers []map[string]interface{}) {
 			url = "https://api.groq.com/openai/v1/models"
 		case "ollama":
 			url = (p["base_url"].(string)) + "/api/tags"
+		case "deepseek", "qwen", "moonshot":
+			baseURL := p["base_url"].(string)
+			url = baseURL + "/models"
 		default:
 			fmt.Println("? (未知类型)")
 			continue
