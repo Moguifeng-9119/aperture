@@ -16,25 +16,29 @@ import (
 	"github.com/2144983846/aperture/internal/config"
 	"github.com/2144983846/aperture/internal/pipeline"
 	"github.com/2144983846/aperture/internal/provider"
+	"github.com/2144983846/aperture/internal/router"
+	"github.com/2144983846/aperture/internal/router/strategy"
 )
 
 type Server struct {
-	cfg           *config.Config
-	router        chi.Router
-	registry      *provider.Registry
-	pipeline      *pipeline.Pipeline
-	authMiddleware func(http.Handler) http.Handler
+	cfg             *config.Config
+	chiRouter       chi.Router
+	registry        *provider.Registry
+	pipeline        *pipeline.Pipeline
+	authMiddleware   func(http.Handler) http.Handler
+	apertureRouter  *router.Router
 }
 
-func New(cfg *config.Config, reg *provider.Registry, pipe *pipeline.Pipeline, authMiddleware func(http.Handler) http.Handler) *Server {
+func New(cfg *config.Config, reg *provider.Registry, pipe *pipeline.Pipeline, authMiddleware func(http.Handler) http.Handler, r *router.Router) *Server {
 	s := &Server{
-		cfg:           cfg,
-		registry:      reg,
-		pipeline:      pipe,
-		authMiddleware: authMiddleware,
+		cfg:            cfg,
+		registry:       reg,
+		pipeline:        pipe,
+		authMiddleware:   authMiddleware,
+		apertureRouter:   r,
 	}
 
-	s.router = chi.NewRouter()
+	s.chiRouter = chi.NewRouter()
 	s.setupMiddleware()
 	s.setupRoutes()
 
@@ -42,24 +46,24 @@ func New(cfg *config.Config, reg *provider.Registry, pipe *pipeline.Pipeline, au
 }
 
 func (s *Server) setupMiddleware() {
-	s.router.Use(middleware.RequestID)
-	s.router.Use(middleware.RealIP)
-	s.router.Use(middleware.Logger)
-	s.router.Use(middleware.Recoverer)
-	s.router.Use(middleware.Timeout(s.cfg.Server.WriteTimeout))
+	s.chiRouter.Use(middleware.RequestID)
+	s.chiRouter.Use(middleware.RealIP)
+	s.chiRouter.Use(middleware.Logger)
+	s.chiRouter.Use(middleware.Recoverer)
+	s.chiRouter.Use(middleware.Timeout(s.cfg.Server.WriteTimeout))
 	if s.authMiddleware != nil {
-		s.router.Use(s.authMiddleware)
+		s.chiRouter.Use(s.authMiddleware)
 	}
 }
 
 func (s *Server) setupRoutes() {
-	s.router.Route("/v1", func(r chi.Router) {
+	s.chiRouter.Route("/v1", func(r chi.Router) {
 		r.Post("/chat/completions", s.handleChatCompletion)
 		r.Post("/messages", s.handleAnthropicMessages)
 		r.Get("/models", s.handleListModels)
 	})
 
-	s.router.Get("/health", s.handleHealth)
+	s.chiRouter.Get("/health", s.handleHealth)
 }
 
 func (s *Server) handleChatCompletion(w http.ResponseWriter, r *http.Request) {
@@ -286,23 +290,30 @@ func (s *Server) handleAnthropicMessages(w http.ResponseWriter, r *http.Request)
 	// Always route — ignore Claude's model preference, let Aperture decide
 	_ = body.Model
 
-	// Route through pipeline
-	req := &pipeline.Request{
-		Model:    "auto",
-		Messages: msgs,
-		Stream:   body.Stream,
+	// Route only — classify without dispatching (proxy handles the actual API call)
+	stratReq := &strategy.Request{
+		Messages: make([]strategy.Message, len(msgs)),
 	}
-	result, err := s.pipeline.Execute(r.Context(), req)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
-		return
+	for i, m := range msgs {
+		stratReq.Messages[i] = strategy.Message{Role: m.Role, Content: m.Content}
+	}
+	targetModel := "deepseek-v4-flash"
+	targetProvider := "deepseek"
+	reason := "default"
+	if s.apertureRouter != nil {
+		decision, err := s.apertureRouter.Classify(r.Context(), stratReq)
+		if err == nil && decision != nil {
+			targetModel = decision.Model
+			targetProvider = decision.Provider
+			reason = decision.Reason
+		}
 	}
 
-	w.Header().Set("X-Aperture-Model", result.Decision.Model)
-	w.Header().Set("X-Aperture-Provider", result.Decision.Provider)
-	w.Header().Set("X-Aperture-Reason", result.Decision.Reason)
+	w.Header().Set("X-Aperture-Model", targetModel)
+	w.Header().Set("X-Aperture-Provider", targetProvider)
+	w.Header().Set("X-Aperture-Reason", reason)
 
-	if err := s.proxyAnthropic(w, r, bodyBytes, result.Decision.Model, body.Stream); err != nil {
+	if err := s.proxyAnthropic(w, r, bodyBytes, targetModel, body.Stream); err != nil {
 		writeError(w, http.StatusBadGateway, err.Error())
 	}
 }
@@ -435,7 +446,7 @@ func (s *Server) resolveProvider(modelName string) (provider.Provider, error) {
 }
 
 func (s *Server) Handler() http.Handler {
-	return s.router
+	return s.chiRouter
 }
 
 func (s *Server) ListenAddr() string {
