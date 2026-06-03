@@ -16,6 +16,7 @@ type Strategy struct {
 	threshold  float64
 	enabled    bool
 	embedder   Embedder
+	examples   map[strategy.ComplexityLevel][]string
 }
 
 type Embedder interface {
@@ -34,6 +35,41 @@ func New(centroids map[strategy.ComplexityLevel][]float64, vocab []string, model
 		enabled:   len(centroids) > 0,
 		embedder:  emb,
 	}
+}
+
+func (s *Strategy) SetExamples(examples map[strategy.ComplexityLevel][]string) {
+	s.examples = examples
+}
+
+func (s *Strategy) Precompute(ctx context.Context) error {
+	if s.embedder == nil || len(s.examples) == 0 {
+		return nil
+	}
+
+	realCentroids := make(map[strategy.ComplexityLevel][]float64)
+	for level, texts := range s.examples {
+		if len(texts) == 0 {
+			continue
+		}
+		combined := texts[0]
+		for _, t := range texts[1:] {
+			combined += " " + t
+		}
+		vec, err := s.embedder.Embed(ctx, combined)
+		if err != nil {
+			return fmt.Errorf("precompute %s: %w", level, err)
+		}
+		realCentroids[level] = vec
+	}
+
+	if len(realCentroids) > 0 {
+		s.centroids = realCentroids
+	}
+	return nil
+}
+
+func (s *Strategy) SetEmbedder(emb Embedder) {
+	s.embedder = emb
 }
 
 func (s *Strategy) Name() string     { return "embedding" }

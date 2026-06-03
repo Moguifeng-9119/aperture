@@ -18,17 +18,18 @@ import (
 )
 
 type Handler struct {
-	router   chi.Router
-	store    *store.Store
+	router        chi.Router
+	store         *store.Store
 	apertureRouter *router.Router
-	adminKey string
+	adminKey      string
+	abTestRouter  *router.ABTestRouter
 }
 
 func New(s *store.Store, r *router.Router, adminKey string) *Handler {
 	h := &Handler{
-		store:    s,
+		store:          s,
 		apertureRouter: r,
-		adminKey: adminKey,
+		adminKey:       adminKey,
 	}
 
 	h.router = chi.NewRouter()
@@ -39,6 +40,10 @@ func New(s *store.Store, r *router.Router, adminKey string) *Handler {
 }
 
 func (h *Handler) Handler() http.Handler { return h.router }
+
+func (h *Handler) SetABTestRouter(r *router.ABTestRouter) {
+	h.abTestRouter = r
+}
 
 func (h *Handler) authMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -68,10 +73,12 @@ func (h *Handler) setupRoutes() {
 		r.Get("/admin/v1/health", h.handleHealth)
 		r.Get("/admin/v1/analytics/summary", h.handleAnalyticsSummary)
 		r.Get("/admin/v1/analytics/requests", h.handleAnalyticsRequests)
+		r.Get("/admin/v1/analytics/export", h.handleExportTrainingData)
 		r.Post("/admin/v1/routing/test", h.handleRoutingTest)
 		r.Get("/admin/v1/keys", h.handleListKeys)
 		r.Post("/admin/v1/keys", h.handleCreateKey)
 		r.Delete("/admin/v1/keys/{id}", h.handleDeleteKey)
+		r.Get("/admin/v1/ab-test/stats", h.handleABTestStats)
 	})
 }
 
@@ -219,6 +226,47 @@ func parseDateRange(r *http.Request) (time.Time, time.Time) {
 	}
 
 	return from, to
+}
+
+func (h *Handler) handleExportTrainingData(w http.ResponseWriter, r *http.Request) {
+	from, to := parseDateRange(r)
+	projectID := r.URL.Query().Get("project_id")
+
+	decisions, _, err := h.store.ListDecisions(from, to, projectID, 1000, 0)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/x-jsonlines")
+	w.Header().Set("Content-Disposition", "attachment; filename=training_data.jsonl")
+
+	enc := json.NewEncoder(w)
+	for _, d := range decisions {
+		if err := enc.Encode(map[string]interface{}{
+			"request_id":  d.RequestID,
+			"strategy":    d.Strategy,
+			"complexity":  d.Complexity,
+			"confidence":  d.Confidence,
+			"model":       d.Model,
+			"provider":    d.Provider,
+			"reason":      d.Reason,
+			"tokens_in":   d.TokensIn,
+			"tokens_out":  d.TokensOut,
+			"latency_ms":  d.LatencyMs,
+			"timestamp":   d.Timestamp,
+		}); err != nil {
+			return
+		}
+	}
+}
+
+func (h *Handler) handleABTestStats(w http.ResponseWriter, r *http.Request) {
+	if h.abTestRouter == nil {
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "AB test not configured"})
+		return
+	}
+	writeJSON(w, http.StatusOK, h.abTestRouter.Stats())
 }
 
 func writeJSON(w http.ResponseWriter, status int, data any) {

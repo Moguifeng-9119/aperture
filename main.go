@@ -100,6 +100,7 @@ func main() {
 
 	embStrat := buildEmbeddingStrategy(cfg, defaultTarget)
 	if embStrat != nil && embStrat.Available() {
+		setupRealEmbeddings(cfg, reg, embStrat)
 		strategies = append(strategies, embStrat)
 		slog.Info("embedding strategy enabled")
 	}
@@ -304,6 +305,42 @@ func buildEmbeddingStrategy(cfg *config.Config, defaultTarget strategy.RouteTarg
 	}
 
 	return nil
+}
+
+func setupRealEmbeddings(cfg *config.Config, reg *provider.Registry, strat *embedding.Strategy) {
+	apiKey := os.Getenv("OPENAI_API_KEY")
+	if apiKey == "" {
+		slog.Info("OPENAI_API_KEY not set, using keyword vector fallback for embeddings")
+		return
+	}
+
+	emb := embedding.NewOpenAIEmbedder(apiKey, "", "text-embedding-3-small")
+	strat.SetEmbedder(emb)
+
+	examples := map[strategy.ComplexityLevel][]string{
+		strategy.ComplexityTrivial: {
+			"hello hi hey thanks bye how are you good morning",
+		},
+		strategy.ComplexitySimple: {
+			"explain what is the difference between compare simple question",
+		},
+		strategy.ComplexityModerate: {
+			"write a detailed analysis review design architecture system api database",
+		},
+		strategy.ComplexityComplex: {
+			"implement a complex algorithm write generate create code function class program",
+		},
+		strategy.ComplexityExpert: {
+			"prove the theorem derive integral equation solve complex mathematical proof research paper",
+		},
+	}
+
+	strat.SetExamples(examples)
+	if err := strat.Precompute(context.Background()); err != nil {
+		slog.Warn("embedding precompute failed, using keyword fallback", "error", err)
+		return
+	}
+	slog.Info("real embeddings enabled via OpenAI text-embedding-3-small")
 }
 
 func buildMLStrategy(cfg *config.Config, defaultTarget strategy.RouteTarget) *ml.Strategy {
