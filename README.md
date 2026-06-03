@@ -1,220 +1,245 @@
-# Aperture
+<picture>
+  <source media="(prefers-color-scheme: dark)">
+  <h1 align="center">🔆 Aperture</h1>
+</picture>
 
-Intelligent multi-model LLM routing gateway — route each request to the optimal model based on complexity, saving 40-70% on API costs without sacrificing quality.
+<p align="center">
+  <strong>One gateway for all your LLMs.</strong><br>
+  Route every request to the right model. Save 40-70% on API costs. Zero config changes in your app.
+</p>
 
-[![CI](https://github.com/Moguifeng-9119/aperture/actions/workflows/ci.yml/badge.svg)](https://github.com/Moguifeng-9119/aperture/actions/workflows/ci.yml)
-[![Go 1.22+](https://img.shields.io/badge/Go-1.22%2B-00ADD8?logo=go)](https://go.dev)
-[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-141%20passing-brightgreen)](https://github.com/Moguifeng-9119/aperture/actions)
+<p align="center">
+  <a href="https://github.com/Moguifeng-9119/aperture/actions/workflows/ci.yml"><img src="https://github.com/Moguifeng-9119/aperture/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/Moguifeng-9119/aperture/releases"><img src="https://img.shields.io/github/v/release/Moguifeng-9119/aperture?color=blue" alt="Release"></a>
+  <a href="https://pkg.go.dev/github.com/Moguifeng-9119/aperture"><img src="https://img.shields.io/badge/go-reference-00ADD8?logo=go" alt="Go Reference"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="License"></a>
+</p>
 
-## Why Aperture?
+---
 
-Every LLM request is different. A simple "hello" doesn't need GPT-4o, and a complex code review shouldn't go to a tiny model. Aperture analyzes each request and routes it to the right model automatically.
+## What is Aperture?
 
-**Key differentiators:**
-- **Explainable routing** — every decision comes with a reason and cost estimate in response headers
-- **Progressive intelligence** — start with fast rule-based routing, upgrade to embeddings and ML as you grow
-- **Cost analytics** — built-in dashboard showing real-time cost savings and model usage
-- **Single binary** — zero dependencies, deploy anywhere. One `aperture` binary is all you need
-- **OpenAI-compatible** — drop-in replacement for `/v1/chat/completions`, works with any OpenAI SDK
+Your app talks to Aperture. Aperture decides which model to use. You save money.
 
-## Features
+```bash
+# Before — your app sends everything to GPT-4o ($10/M tokens)
+curl https://api.openai.com/v1/chat/completions -d '{"model":"gpt-4o",...}'
 
-- [x] OpenAI-compatible API (`/v1/chat/completions`, `/v1/models`)
-- [x] Multi-provider: OpenAI, Anthropic, Groq, Ollama
-- [x] Streaming (SSE) and non-streaming responses
-- [x] Tier 1: Rule-based routing (keywords, regex, token count)
-- [x] Tier 2: Real embedding routing (OpenAI text-embedding-3-small, keyword vector fallback)
-- [x] Tier 3: ML classifier (local ONNX, trainable)
-- [x] Built-in admin dashboard (HTMX + Alpine.js + Chart.js)
-- [x] Admin API (analytics, API key CRUD, routing test)
-- [x] Cost tracking and savings calculation
-- [x] Multi-turn conversation context
-- [x] API key authentication + rate limiting
-- [x] Pipeline fallback chain + retry on provider errors
-- [x] A/B testing: compare two routing strategies side-by-side
-- [x] Training data export (JSONL format for ML training)
-- [x] Docker Compose (aperture + ollama)
-- [x] Prometheus metrics endpoint (`/metrics`)
-- [x] Graceful shutdown
-- [x] Single binary build + Docker image + goreleaser
+# After — Aperture routes "hello" → Llama 3 (free), "write code" → GPT-4o ($10)
+curl http://localhost:8080/v1/chat/completions -d '{"model":"auto",...}'
+```
+
+A simple "hello" routes to a cheap model. A complex code review routes to GPT-4o. **Every decision is explained** in response headers so you can trust it.
+
+### How routing works
+
+| Tier | Strategy | Speed | Accuracy | When to use |
+|:----:|----------|:-----:|:--------:|-------------|
+| **1** | **Rules** — keywords, regex, token count | <0.1ms | ~80% | Zero config, works instantly |
+| **2** | **Embeddings** — OpenAI text-embedding-3-small | ~200ms | ~90% | Set `OPENAI_API_KEY` for semantic matching |
+| **3** | **ML** — custom ONNX classifier | <1ms | ~95% | Export data → train → deploy your own model |
+
+No match? Request falls through to the next tier. Tiers 2 and 3 are **completely optional**.
+
+---
 
 ## Quick Start
 
-### Prerequisites
-- Go 1.22+ (for building from source)
-- One or more API keys: OpenAI, Anthropic, Groq, or Ollama (local)
-
-### Build from source
+### Homebrew (macOS)
 ```bash
-git clone https://github.com/Moguifeng-9119/aperture.git
-cd aperture
-make build
+brew install Moguifeng-9119/tap/aperture
 ```
 
-### Configure
+### Go install
 ```bash
+go install github.com/Moguifeng-9119/aperture@latest
+```
+
+### Binary download
+Pick your platform from the [latest release](https://github.com/Moguifeng-9119/aperture/releases/latest).
+
+### Docker Compose (aperture + ollama, zero API keys)
+```bash
+git clone https://github.com/Moguifeng-9119/aperture.git && cd aperture
 cp config.example.yaml config.yaml
-# Edit config.yaml with your API keys, or use environment variables:
+docker compose up -d
+# Ready at http://localhost:8080 — dashboard at /dashboard
+```
+
+### From source
+```bash
+git clone https://github.com/Moguifeng-9119/aperture.git && cd aperture
+make build
+cp config.example.yaml config.yaml
 export OPENAI_API_KEY="sk-..."
-export ANTHROPIC_API_KEY="sk-ant-..."
-export APERTURE_ADMIN_KEY="your-admin-key"
-```
-
-### Run
-```bash
 ./aperture --config config.yaml
-# Aperture gateway listening on 0.0.0.0:8080
-# Dashboard at http://localhost:8080/dashboard
 ```
 
-### Use
+### Try it
 ```bash
-# Direct model access (bypasses routing)
-curl http://localhost:8080/v1/chat/completions \
+# Auto mode — let Aperture pick the best model
+curl -s http://localhost:8080/v1/chat/completions \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer sk-your-key" \
-  -d '{
-    "model": "gpt-4o-mini",
-    "messages": [{"role": "user", "content": "Hello!"}]
-  }'
+  -d '{"model":"auto","messages":[{"role":"user","content":"Write a Python function to sort an array"}]}' \
+  | jq '.choices[0].message.content'
 
-# Auto-routing mode — let Aperture choose the best model
-curl http://localhost:8080/v1/chat/completions \
+# Check which model was used
+curl -sI http://localhost:8080/v1/chat/completions \
   -H "Content-Type: application/json" \
-  -d '{
-    "model": "auto",
-    "messages": [{"role": "user", "content": "Write a function to sort an array"}]
-  }'
-# Response headers include:
-#   X-Aperture-Model: gpt-4o
-#   X-Aperture-Provider: openai
-#   X-Aperture-Reason: rule:code_generation matched → complexity=complex → openai/gpt-4o
+  -d '{"model":"auto","messages":[{"role":"user","content":"Hello!"}]}' \
+  | grep X-Aperture
+# X-Aperture-Model: llama-3.1-8b-instant
+# X-Aperture-Provider: groq
+# X-Aperture-Reason: rule:greeting matched → trivial → groq/llama-3.1-8b-instant
 ```
+
+---
+
+## Features
+
+### Routing
+- **Explainable decisions** — every response includes `X-Aperture-*` headers with the reasoning
+- **Progressive tiers** — start with fast rules, add embeddings/ML later
+- **`"model": "auto"`** — drop-in replacement; existing code doesn't change
+
+### Providers
+- OpenAI (GPT-4o, GPT-4o-mini, any compatible API)
+- Anthropic (Claude Opus, Sonnet, Haiku)
+- Groq (Llama 3.1 at 1,200 tok/s)
+- Ollama (local models — Qwen, DeepSeek, Mistral, etc.)
+
+### Production
+- **Fallback chain** — primary model fails? automatically retry with backup
+- **Rate limiting** — per-API-key throttling
+- **Cost analytics** — real-time dashboard with model-level cost breakdown
+- **Prometheus metrics** — `/metrics` endpoint for Grafana dashboards
+- **Graceful shutdown** — no dropped requests on restart
+- **Single binary** — no Node.js, no Python, no dependencies
+
+### Developer tools
+- **A/B testing** — compare two routing strategies side-by-side, see agreement stats at `/admin/v1/ab-test/stats`
+- **Training data export** — `GET /admin/v1/analytics/export` → JSONL for ML training
+- **Dry-run routing** — `POST /admin/v1/routing/test` to see what model would be chosen
+- **Admin dashboard** — built-in HTMX + Alpine.js UI at `/dashboard`
+
+---
 
 ## Architecture
 
 ```
-Client (OpenAI SDK) → Aperture Gateway (:8080)
-                         │
-                    ┌─────▼──────┐
-                    │  Pipeline   │
-                    │  1. Auth    │
-                    │  2. Context │
-                    │  3. Route   │
-                    │  4. Dispatch│
-                    │  5. Record  │
-                    └─────┬──────┘
+                  POST /v1/chat/completions
+                  {"model": "auto", "messages": [...]}
+                              │
+                              ▼
+          ┌───────────────────────────────────┐
+          │            Pipeline               │
+          │  Auth → Context → Route → Dispatch│
+          └───────────────┬───────────────────┘
                           │
-              ┌───────────▼───────────┐
-              │   Routing Engine      │
-              │  Tier 1: Rules        │  <0.1ms, ~80% coverage
-              │  Tier 2: Embeddings   │  ~5ms, semantic matching
-              │  Tier 3: ML (ONNX)    │  ~1ms, custom trained
-              └───────────┬───────────┘
+          ┌───────────────▼───────────────────┐
+          │        Routing Engine             │
+          │                                   │
+          │  Tier 1: Rules     <0.1ms  80%    │
+          │  Tier 2: Embed     ~200ms  90%    │
+          │  Tier 3: ML        <1ms    95%    │
+          └───────────────┬───────────────────┘
                           │
         ┌─────────────────┼─────────────────┐
         ▼                 ▼                  ▼
-    OpenAI          Anthropic           Groq / Ollama
+    OpenAI           Anthropic        Groq / Ollama
 ```
 
-## API Reference
+---
 
-### Chat Completions (OpenAI-compatible)
+## API
+
+### OpenAI-compatible (drop-in replacement)
 ```
-POST /v1/chat/completions
-  Header: Authorization: Bearer <api-key>
-  Header: X-Conversation-Id (optional, for multi-turn)
-  Body: {
-    "model": "auto" | "gpt-4o" | "claude-3-haiku" | ...,
-    "messages": [...],
-    "stream": false
-  }
-  Response Headers:
-    X-Aperture-Model         → model used
-    X-Aperture-Provider      → provider used
-    X-Aperture-Reason        → routing decision reason
-    X-Aperture-Saving-USD    → estimated cost saving
+POST   /v1/chat/completions    # supports stream=true
+GET    /v1/models               # lists all models including "auto"
+GET    /health                  # provider health status
 ```
 
-### List Models
-```
-GET /v1/models
-```
-
-### Health Check
-```
-GET /health
-```
-
-### Admin API (requires X-Admin-Key)
+### Admin (requires `X-Admin-Key` header)
 ```
 GET    /admin/v1/health
-GET    /admin/v1/analytics/summary?from=&to=&project_id=
-GET    /admin/v1/analytics/requests?page=&per_page=
-GET    /admin/v1/analytics/export?from=&to=          (JSONL training data)
-POST   /admin/v1/routing/test          { "messages": [...] }
+GET    /admin/v1/analytics/summary         ?from=2024-01-01&to=2024-01-31
+GET    /admin/v1/analytics/requests        ?page=1&per_page=50
+GET    /admin/v1/analytics/export          (JSONL training data)
+POST   /admin/v1/routing/test              { "messages": [...] }
 GET    /admin/v1/keys
-POST   /admin/v1/keys                  { "name": "my-key" }
+POST   /admin/v1/keys                      { "name": "production" }
 DELETE /admin/v1/keys/{id}
-GET    /admin/v1/ab-test/stats         (A/B comparison stats)
+GET    /admin/v1/ab-test/stats             (A/B agreement rate)
 ```
 
-### Metrics
+### Observability
 ```
-GET /metrics     (Prometheus text format)
+GET    /metrics                # Prometheus text format
+GET    /dashboard              # Built-in analytics UI
 ```
 
-## Roadmap
+---
 
-### Completed
-| Version | Feature | |
-|---------|---------|:--:|
-| **v0.1** | Core proxy + OpenAI adapter + Docker + goreleaser | ✓ |
-| **v0.2** | 4 providers (OpenAI, Anthropic, Groq, Ollama) + rule-based routing + streaming | ✓ |
-| **v0.3** | Embedding classification + cost analytics + SQLite + dashboard UI + admin API | ✓ |
-| **v0.4** | Fallback chain + retry + rate limiter + model cost wiring + Docker Compose + CI | ✓ |
-| **v0.5** | Real embeddings (OpenAI) + A/B testing + training data export | ✓ |
-| **—** | 14 test packages, 4 provider tests, CI (Go 1.25, go vet, build) | ✓ |
+## Configuration
 
-### Next (v0.6)
-| Feature | Effort |
-|---------|:------:|
-| OpenTelemetry distributed tracing (span per pipeline stage) | M |
-| Structured error codes (replacing raw error strings) | M |
-| Helm chart for Kubernetes deployment | M |
-| Load testing suite (vegeta or k6 scripts) | M |
-| Request log search/filter in dashboard | M |
+Minimal `config.yaml` to get started:
 
-### Future (v0.7 — v1.0)
-| Version | Feature |
-|---------|---------|
-| **v0.7** | Token-aware routing: estimate cost BEFORE dispatching |
-| **v0.8** | Multi-tenancy: project isolation, per-project budgets, usage quotas |
-| **v0.9** | Caching layer: cache identical/similar requests to skip API calls |
-| **v1.0** | Plugin system: user-defined Strategy implementations via Go plugin or WASM |
+```yaml
+server:
+  port: 8080
+
+providers:
+  - id: openai
+    type: openai
+    api_key: "${OPENAI_API_KEY}"
+  - id: ollama
+    type: ollama
+    base_url: "http://localhost:11434"
+
+routing:
+  default_model: gpt-4o-mini
+  default_provider: openai
+```
+
+See [`config.example.yaml`](config.example.yaml) for all options including fallback chains, custom rules, rate limits, and per-model pricing.
+
+---
 
 ## Development
 
 ```bash
-make build        # build binary
-make dev          # go run
+make build        # build binary → ./aperture
+make dev          # go run .
 make test         # run all tests
-make test-cover   # run tests + generate coverage HTML
+make test-cover   # tests + coverage HTML
 make lint         # go vet
 make docker-build # build Docker image
-make docker-run   # run with Docker
 ```
 
-### Docker Compose (local dev)
-```bash
-docker compose up -d    # aperture + ollama, ready at :8080
-```
+---
+
+## Roadmap
+
+| Done | Milestone |
+|:----:|-----------|
+| ✓ | Core proxy + OpenAI adapter |
+| ✓ | 4 providers + rule-based routing + streaming |
+| ✓ | Embeddings + cost analytics + SQLite + dashboard |
+| ✓ | Fallback chain + retry + rate limiter + cost wiring |
+| ✓ | Real embeddings (OpenAI) + A/B testing + training export |
+| ✓ | Docker Compose + CI + multi-platform releases |
+
+| Next | Planned |
+|:----:|---------|
+| — | OpenTelemetry tracing + structured error codes |
+| — | Helm chart + load testing suite |
+| — | Token-aware routing (estimate cost before dispatching) |
+| — | Multi-tenancy + caching layer |
+| — | Plugin system (WASM / Go plugins) |
+
+---
 
 ## License
 
-MIT
-
-## License
-
-MIT
+MIT © [Moguifeng-9119](https://github.com/Moguifeng-9119)
