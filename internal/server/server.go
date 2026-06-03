@@ -444,16 +444,51 @@ func (s *Server) calculateModelCost(model string, tokensIn, tokensOut int) float
 }
 
 func (s *Server) extractAnthropicTokens(data []byte) (int, int) {
+	// Try non-stream format first (single JSON object)
 	var resp struct {
 		Usage struct {
 			InputTokens  int `json:"input_tokens"`
 			OutputTokens int `json:"output_tokens"`
 		} `json:"usage"`
 	}
-	if json.Unmarshal(data, &resp) == nil {
+	if json.Unmarshal(data, &resp) == nil && (resp.Usage.InputTokens > 0 || resp.Usage.OutputTokens > 0) {
 		return resp.Usage.InputTokens, resp.Usage.OutputTokens
 	}
-	return 0, 0
+
+	// SSE stream: scan each line for message_start (input) and message_delta (output)
+	var inputTokens, outputTokens int
+	for _, line := range bytes.Split(data, []byte{'\n'}) {
+		if !bytes.HasPrefix(line, []byte("data: ")) {
+			continue
+		}
+		payload := bytes.TrimPrefix(line, []byte("data: "))
+
+		// message_start: {"type":"message_start","message":{"usage":{"input_tokens":N}}}
+		var start struct {
+			Type    string `json:"type"`
+			Message struct {
+				Usage struct {
+					InputTokens int `json:"input_tokens"`
+				} `json:"usage"`
+			} `json:"message"`
+		}
+		if json.Unmarshal(payload, &start) == nil && start.Type == "message_start" {
+			inputTokens = start.Message.Usage.InputTokens
+		}
+
+		// message_delta: {"type":"message_delta","usage":{"output_tokens":N}}
+		var delta struct {
+			Type  string `json:"type"`
+			Usage struct {
+				OutputTokens int `json:"output_tokens"`
+			} `json:"usage"`
+		}
+		if json.Unmarshal(payload, &delta) == nil && delta.Type == "message_delta" {
+			outputTokens = delta.Usage.OutputTokens
+		}
+	}
+
+	return inputTokens, outputTokens
 }
 
 func (s *Server) getProviderAnthropicURL(model string) string {
