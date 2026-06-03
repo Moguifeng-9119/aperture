@@ -1,0 +1,28 @@
+version: "3.9"
+
+services:
+  aperture:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      - APERTURE_ADMIN_KEY=admin
+      - APERTURE_PROVIDER_OLLAMA_API_KEY=
+    volumes:
+      - ./config.yaml:/app/config.yaml
+      - aperture_data:/app/data
+    depends_on:
+      - ollama
+    restart: unless-stopped
+
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    restart: unless-stopped
+
+volumes:
+  aperture_data:
+  ollama_data:

@@ -10,6 +10,8 @@ import (
 	"os/signal"
 	"time"
 
+	"github.com/2144983846/aperture/internal/auth"
+
 	"github.com/2144983846/aperture/internal/admin"
 	"github.com/2144983846/aperture/internal/analytics"
 	"github.com/2144983846/aperture/internal/config"
@@ -131,9 +133,15 @@ func main() {
 	}
 
 	kvStore := newKVStore(db)
-	authMiddleware := setupAuth(cfg, kvStore)
+	var rateMiddleware func(http.Handler) http.Handler
+	if kvStore != nil {
+		keyStore := &keyStoreAdapter{inner: kvStore}
+		authM := auth.NewMiddleware(keyStore, cfg.Auth.RateLimitDefaultRPM)
+		rateMiddleware = authM.Authenticate
+		slog.Info("rate limiting enabled", "rpm", cfg.Auth.RateLimitDefaultRPM)
+	}
 
-	srv := server.New(cfg, reg, pipe, authMiddleware)
+	srv := server.New(cfg, reg, pipe, rateMiddleware)
 
 	var adminHandler http.Handler
 	if db != nil {
@@ -188,6 +196,30 @@ func main() {
 	}
 }
 
+type keyStoreAdapter struct {
+	inner *store.APIKeyStore
+}
+
+func (a *keyStoreAdapter) Validate(key string) (*auth.APIKey, error) {
+	sk, err := a.inner.Validate(key)
+	if err != nil || sk == nil {
+		return nil, err
+	}
+	ak := &auth.APIKey{
+		ID:            sk.ID,
+		Name:          sk.Name,
+		ProjectID:     sk.ProjectID,
+		RateLimitRPM:  sk.RateLimitRPM,
+		BudgetUSD:     sk.BudgetUSD,
+		AllowedModels: sk.AllowedModels,
+		IsActive:      sk.IsActive,
+	}
+	if sk.LastUsedAt != nil {
+		ak.LastUsedAt = *sk.LastUsedAt
+	}
+	return ak, nil
+}
+
 func newKVStore(db *store.Store) *store.APIKeyStore {
 	if db == nil {
 		return nil
@@ -195,42 +227,6 @@ func newKVStore(db *store.Store) *store.APIKeyStore {
 	return store.NewAPIKeyStore(db)
 }
 
-func setupAuth(cfg *config.Config, kvStore *store.APIKeyStore) func(http.Handler) http.Handler {
-	if kvStore == nil {
-		return func(next http.Handler) http.Handler { return next }
-	}
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			key := extractKey(r)
-			if key == "" {
-				next.ServeHTTP(w, r)
-				return
-			}
-			apiKey, err := kvStore.Validate(key)
-			if err != nil || apiKey == nil {
-				next.ServeHTTP(w, r)
-				return
-			}
-			ctx := context.WithValue(r.Context(), contextKeyAPIKey, apiKey)
-			next.ServeHTTP(w, r.WithContext(ctx))
-		})
-	}
-}
-
-func extractKey(r *http.Request) string {
-	auth := r.Header.Get("Authorization")
-	if len(auth) > 7 && auth[:7] == "Bearer " {
-		return auth[7:]
-	}
-	if key := r.Header.Get("X-API-Key"); key != "" {
-		return key
-	}
-	return ""
-}
-
-type contextKey string
-
-var contextKeyAPIKey contextKey = "api_key"
 
 func newProvider(cfg config.ProviderConfig) (provider.Provider, error) {
 	switch cfg.Type {
