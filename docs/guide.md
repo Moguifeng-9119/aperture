@@ -21,7 +21,8 @@
 
 ```bash
 # 1. 下载编译
-git clone https://github.com/Moguifeng-9119/aperture.git && cd aperture
+git clone https://github.com/Moguifeng-9119/aperture.git
+cd aperture
 make build
 
 # 2. 生成配置（交互式，一路回车）

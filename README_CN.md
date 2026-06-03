@@ -37,12 +37,17 @@ Aperture 的做法：分析请求内容，自动把"你好"扔给便宜的模型
 > 📖 **完整配置教程**：[docs/guide.md](docs/guide.md) — 覆盖 DeepSeek/通义千问/Kimi/GLM/MiniMax/MiMo 等国产模型接入
 
 ```bash
-git clone https://github.com/Moguifeng-9119/aperture.git && cd aperture
+git clone https://github.com/Moguifeng-9119/aperture.git
+cd aperture
 make build
+
+# 生成配置（交互式问答，推荐）
+./aperture -setup
+
+# 或手动写配置
 cp config.example.yaml config.yaml
-export OPENAI_API_KEY="sk-..."
+# 编辑 config.yaml，填 API Key，然后启动
 ./aperture
-# → 监听 :8080，Dashboard 在 /dashboard，Metrics 在 /metrics
 ```
 
 ```bash
