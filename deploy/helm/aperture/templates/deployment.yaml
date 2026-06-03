@@ -1,0 +1,63 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "aperture.fullname" . }}
+  labels:
+    {{- include "aperture.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "aperture.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "aperture.selectorLabels" . | nindent 8 }}
+    spec:
+      containers:
+        - name: aperture
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.service.port }}
+              protocol: TCP
+          env:
+            {{- if .Values.env.OPENAI_API_KEY }}
+            - name: OPENAI_API_KEY
+              value: {{ .Values.env.OPENAI_API_KEY | quote }}
+            {{- end }}
+            {{- if .Values.env.ANTHROPIC_API_KEY }}
+            - name: ANTHROPIC_API_KEY
+              value: {{ .Values.env.ANTHROPIC_API_KEY | quote }}
+            {{- end }}
+            {{- if .Values.env.GROQ_API_KEY }}
+            - name: GROQ_API_KEY
+              value: {{ .Values.env.GROQ_API_KEY | quote }}
+            {{- end }}
+          volumeMounts:
+            - name: config
+              mountPath: /app/config.yaml
+              subPath: config.yaml
+            {{- if .Values.persistence.enabled }}
+            - name: data
+              mountPath: /app/data
+            {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.service.port }}
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.service.port }}
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "aperture.fullname" . }}-config
+        {{- if .Values.persistence.enabled }}
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ include "aperture.fullname" . }}-data
+        {{- end }}
