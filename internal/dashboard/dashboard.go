@@ -448,23 +448,12 @@ input:focus,select:focus{outline:none;border-color:var(--accent)}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
 </style>
 </head>
-<script>
-document.body.addEventListener('htmx:configRequest', function(evt) {
-  var key = localStorage.getItem('adminKey') || '';
-  if (key) evt.detail.headers['X-Admin-Key'] = key;
-});
-</script>
-<body x-data="{page:'overview',adminKey:localStorage.getItem('adminKey')||''}">
+<body x-data="{page:'overview'}">
 <aside class="sidebar">
   <h1>Aperture<span>.</span></h1>
   <a href="#" :class="page==='overview'&&'active'" @click.prevent="page='overview';htmx.ajax('GET','/dashboard/data/overview','#page-content')">Overview</a>
   <a href="#" :class="page==='routing'&&'active'" @click.prevent="page='routing';htmx.ajax('GET','/dashboard/data/routing','#page-content')">Routing</a>
-  <a href="#" :class="page==='keys'&&'active'" @click.prevent="page='keys';htmx.ajax('GET','/dashboard/data/keys','#page-content')">API Keys</a>
   <a href="#" :class="page==='log'&&'active'" @click.prevent="page='log';htmx.ajax('GET','/dashboard/data/log','#page-content')">Request Log</a>
-  <div style="padding:20px;margin-top:auto">
-    <label style="font-size:11px;color:var(--muted)">Admin Key</label>
-    <input type="password" x-model="adminKey" @change="localStorage.setItem('adminKey',adminKey)" style="font-size:11px;padding:6px 10px">
-  </div>
 </aside>
 <main class="main">
   <div id="page-content" hx-get="/dashboard/data/overview" hx-trigger="load" hx-swap="innerHTML">
