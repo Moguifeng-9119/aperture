@@ -223,6 +223,6 @@ make docker-build # build Docker image
 
 <div align="center">
 
-**MIT** · [Moguifeng-9119](https://github.com/Moguifeng-9119)
+MIT License — use it, fork it, ship it. No strings attached.
 
 </div>
