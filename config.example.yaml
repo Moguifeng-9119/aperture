@@ -154,6 +154,40 @@ providers:
   #       cost_per_1k_input: 0.012
   #       cost_per_1k_output: 0.012
   #       max_tokens: 8192
+  #
+  # - id: "zhipu"
+  #   type: "openai"
+  #   api_key: "${ZHIPU_API_KEY}"
+  #   base_url: "https://open.bigmodel.cn/api/paas/v4"
+  #   models:
+  #     - id: "glm-4-flash"
+  #       cost_per_1k_input: 0.0
+  #       cost_per_1k_output: 0.0
+  #       max_tokens: 131072
+  #     - id: "glm-4-plus"
+  #       cost_per_1k_input: 0.007
+  #       cost_per_1k_output: 0.007
+  #       max_tokens: 131072
+  #
+  # - id: "minimax"
+  #   type: "openai"
+  #   api_key: "${MINIMAX_API_KEY}"
+  #   base_url: "https://api.minimax.chat/v1"
+  #   models:
+  #     - id: "abab6.5s-chat"
+  #       cost_per_1k_input: 0.001
+  #       cost_per_1k_output: 0.001
+  #       max_tokens: 245760
+  #
+  # - id: "mimo"
+  #   type: "openai"
+  #   api_key: "${XIAOMI_API_KEY}"
+  #   base_url: "https://api.mi.com/v1"
+  #   models:
+  #     - id: "mi-mo"
+  #       cost_per_1k_input: 0.001
+  #       cost_per_1k_output: 0.002
+  #       max_tokens: 131072
 
 conversation:
   max_messages: 50

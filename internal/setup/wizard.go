@@ -194,15 +194,19 @@ func (w *Wizard) askProviders() []map[string]interface{} {
 	}
 
 	// Domestic Chinese Models
-	fmt.Println("  [5/5] 国产模型 (DeepSeek V4, 通义千问, Moonshot)")
+	fmt.Println("  [5/5] 国产模型")
+	fmt.Println("    DeepSeek V4 | 通义千问 | Kimi | 智谱 GLM | MiniMax | 小米 MiMo")
 	useDomestic := w.askDefault("    启用国产模型? (y/n)", "y")
 	if strings.ToLower(useDomestic) == "y" {
 		fmt.Println()
 		fmt.Println("    选择模型:")
-		fmt.Println("      [1] DeepSeek V4 (deepseek-v4-pro + deepseek-v4-flash)")
-		fmt.Println("      [2] 通义千问 Qwen (qwen-plus)")
-		fmt.Println("      [3] Moonshot Kimi (moonshot-v1-8k)")
-		modelChoice := w.askDefault("    选择 (1/2/3)", "1")
+		fmt.Println("      [1] DeepSeek V4 — deepseek-v4-flash + deepseek-v4-pro")
+		fmt.Println("      [2] 通义千问 Qwen — qwen-plus (阿里云 DashScope)")
+		fmt.Println("      [3] Kimi — moonshot-v1-8k (月之暗面)")
+		fmt.Println("      [4] 智谱 GLM — glm-4-flash (智谱 AI)")
+		fmt.Println("      [5] MiniMax — abab6.5s-chat (MiniMax)")
+		fmt.Println("      [6] 小米 MiMo — mi-mo (小米)")
+		modelChoice := w.askDefault("    选择 (1-6)", "1")
 
 		switch modelChoice {
 		case "1":
@@ -220,6 +224,7 @@ func (w *Wizard) askProviders() []map[string]interface{} {
 				})
 				fmt.Println("      ✓ DeepSeek V4 已配置")
 			}
+
 		case "2":
 			apiKey := w.askDefault("      DashScope API Key", os.Getenv("DASHSCOPE_API_KEY"))
 			if apiKey != "" {
@@ -234,6 +239,7 @@ func (w *Wizard) askProviders() []map[string]interface{} {
 				})
 				fmt.Println("      ✓ 通义千问已配置")
 			}
+
 		case "3":
 			apiKey := w.askDefault("      Moonshot API Key", os.Getenv("MOONSHOT_API_KEY"))
 			if apiKey != "" {
@@ -246,7 +252,53 @@ func (w *Wizard) askProviders() []map[string]interface{} {
 						{"id": "moonshot-v1-8k", "cost_per_1k_input": 0.012, "cost_per_1k_output": 0.012, "max_tokens": 8192},
 					},
 				})
-				fmt.Println("      ✓ Moonshot 已配置")
+				fmt.Println("      ✓ Kimi 已配置")
+			}
+
+		case "4":
+			apiKey := w.askDefault("      智谱 API Key", os.Getenv("ZHIPU_API_KEY"))
+			if apiKey != "" {
+				providers = append(providers, map[string]interface{}{
+					"id":       "zhipu",
+					"type":     "openai",
+					"api_key":  apiKey,
+					"base_url": "https://open.bigmodel.cn/api/paas/v4",
+					"models": []map[string]interface{}{
+						{"id": "glm-4-flash", "cost_per_1k_input": 0.0, "cost_per_1k_output": 0.0, "max_tokens": 131072},
+						{"id": "glm-4-plus", "cost_per_1k_input": 0.007, "cost_per_1k_output": 0.007, "max_tokens": 131072},
+					},
+				})
+				fmt.Println("      ✓ 智谱 GLM 已配置")
+			}
+
+		case "5":
+			apiKey := w.askDefault("      MiniMax API Key", os.Getenv("MINIMAX_API_KEY"))
+			if apiKey != "" {
+				providers = append(providers, map[string]interface{}{
+					"id":       "minimax",
+					"type":     "openai",
+					"api_key":  apiKey,
+					"base_url": "https://api.minimax.chat/v1",
+					"models": []map[string]interface{}{
+						{"id": "abab6.5s-chat", "cost_per_1k_input": 0.001, "cost_per_1k_output": 0.001, "max_tokens": 245760},
+					},
+				})
+				fmt.Println("      ✓ MiniMax 已配置")
+			}
+
+		case "6":
+			apiKey := w.askDefault("      小米 API Key", os.Getenv("XIAOMI_API_KEY"))
+			if apiKey != "" {
+				providers = append(providers, map[string]interface{}{
+					"id":       "mimo",
+					"type":     "openai",
+					"api_key":  apiKey,
+					"base_url": "https://api.mi.com/v1",
+					"models": []map[string]interface{}{
+						{"id": "mi-mo", "cost_per_1k_input": 0.001, "cost_per_1k_output": 0.002, "max_tokens": 131072},
+					},
+				})
+				fmt.Println("      ✓ 小米 MiMo 已配置")
 			}
 		}
 	} else {
@@ -407,7 +459,7 @@ func (w *Wizard) testConnections(providers []map[string]interface{}) {
 			url = "https://api.groq.com/openai/v1/models"
 		case "ollama":
 			url = (p["base_url"].(string)) + "/api/tags"
-		case "deepseek", "qwen", "moonshot":
+		case "deepseek", "qwen", "moonshot", "zhipu", "minimax", "mimo":
 			baseURL := p["base_url"].(string)
 			url = baseURL + "/models"
 		default:
