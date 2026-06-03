@@ -6,9 +6,6 @@ on:
   pull_request:
     branches: [master, main]
 
-env:
-  GOTOOLCHAIN: local
-
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -17,7 +14,7 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.23"
+          go-version: "1.25"
 
       - run: go test -cover ./...
 
@@ -28,7 +25,7 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.23"
+          go-version: "1.25"
 
       - run: go vet ./...
 
@@ -39,6 +36,6 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.23"
+          go-version: "1.25"
 
       - run: go build -ldflags="-s -w" -o aperture .
