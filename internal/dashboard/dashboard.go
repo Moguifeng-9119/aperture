@@ -274,7 +274,7 @@ func (d *Dashboard) handleLogData(w http.ResponseWriter, r *http.Request) {
 			status = "ERR"
 		}
 
-		rows += fmt.Sprintf(`<tr class="log-table"><td>%s</td><td>%s/%s</td><td><span class="badge %s">%s</span></td><td>%d/%d</td><td>$%.5f</td><td>%dms</td><td>%s</td></tr>`,
+		rows += fmt.Sprintf(`<tr class="log-table"><td>%s</td><td>%s/%s</td><td><span class="badge %s">%s</span></td><td>%d/%d</td><td>$%.5f</td><td>%s</td></tr>`,
 			dec.Timestamp.Format("15:04:05"), dec.Provider, dec.Model, badgeClass, dec.Complexity,
 			dec.TokensIn, dec.TokensOut, dec.CostUSD, status)
 	}
