@@ -229,6 +229,18 @@ make docker-build # build Docker image
 
 ---
 
+---
+
+## Community
+
+🐛 **Bug?** [Open an issue](https://github.com/Moguifeng-9119/aperture/issues/new?template=bug_report.yml) — structured template, takes 30 seconds
+
+💡 **Feature idea?** [Request it](https://github.com/Moguifeng-9119/aperture/issues/new?template=feature_request.yml)
+
+💬 **Questions?** [Discussions](https://github.com/Moguifeng-9119/aperture/discussions) — ask anything
+
+---
+
 <div align="center">
 
 MIT License — use it, fork it, ship it. No strings attached.

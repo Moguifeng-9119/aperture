@@ -1,0 +1,77 @@
+name: Bug Report
+description: Report a bug or problem
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug! Please fill in the details below.
+  - type: input
+    id: version
+    attributes:
+      label: Aperture Version
+      placeholder: "e.g. v0.7.3, or commit hash"
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Describe the bug and what you expected to happen.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: |
+        1. Run `...`
+        2. Send request `...`
+        3. See error
+      placeholder: |
+        1. Start aperture with `./aperture`
+        2. Send POST to `/v1/chat/completions` with `{"model":"auto",...}`
+        3. Server returns 500
+    validations:
+      required: true
+  - type: textarea
+    id: config
+    attributes:
+      label: config.yaml (redact API keys)
+      description: Paste your config with secrets removed.
+      render: yaml
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Any error logs from the terminal.
+      render: shell
+  - type: dropdown
+    id: provider
+    attributes:
+      label: Which provider?
+      options:
+        - DeepSeek V4
+        - OpenAI
+        - Anthropic
+        - Groq
+        - Ollama
+        - Qwen (DashScope)
+        - Kimi (Moonshot)
+        - GLM (Zhipu)
+        - MiniMax
+        - MiMo
+        - Other / Multiple
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating System
+      options:
+        - Windows
+        - macOS
+        - Linux
+        - Docker
+        - Other
