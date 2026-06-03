@@ -347,6 +347,7 @@ func (s *Server) handleAnthropicMessages(w http.ResponseWriter, r *http.Request)
 
 	tokensIn, tokensOut := s.proxyAnthropic(w, r, bodyBytes, targetModel, body.Stream)
 	if s.store != nil && (tokensIn > 0 || tokensOut > 0) {
+		costUSD := s.calculateModelCost(targetModel, tokensIn, tokensOut)
 		s.store.RecordDecision(&store.RoutingDecision{
 			Timestamp:  time.Now(),
 			RequestID:  fmt.Sprintf("req_%d", time.Now().UnixNano()),
@@ -358,6 +359,7 @@ func (s *Server) handleAnthropicMessages(w http.ResponseWriter, r *http.Request)
 			Reason:      reason,
 			TokensIn:    tokensIn,
 			TokensOut:   tokensOut,
+			CostUSD:     costUSD,
 			HTTPStatus:  200,
 		})
 	}
@@ -427,6 +429,18 @@ func (s *Server) proxyAnthropic(w http.ResponseWriter, r *http.Request, bodyByte
 	io.Copy(&buf, resp.Body)
 	w.Write(buf.Bytes())
 	return s.extractAnthropicTokens(buf.Bytes())
+}
+
+func (s *Server) calculateModelCost(model string, tokensIn, tokensOut int) float64 {
+	for _, p := range s.registry.List() {
+		models, _ := p.ListModels(context.Background())
+		for _, m := range models {
+			if m.ID == model && (m.CostPer1KInput > 0 || m.CostPer1KOutput > 0) {
+				return float64(tokensIn)/1000*m.CostPer1KInput + float64(tokensOut)/1000*m.CostPer1KOutput
+			}
+		}
+	}
+	return 0
 }
 
 func (s *Server) extractAnthropicTokens(data []byte) (int, int) {
