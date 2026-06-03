@@ -375,6 +375,138 @@ func TestPipeline_New(t *testing.T) {
 	}
 }
 
+func TestPipeline_FallbackChain(t *testing.T) {
+	primary := &stubProvider{
+		id:  "openai",
+		err: fmt.Errorf("primary timeout"),
+	}
+	fallback := &stubProvider{
+		id: "anthropic",
+		response: &provider.ChatResponse{
+			ID:    "fb-resp",
+			Model: "claude-3-haiku",
+			Choices: []provider.Choice{
+				{Index: 0, Message: &provider.Message{Role: "assistant", Content: "Fallback response"}},
+			},
+			Usage: provider.Usage{PromptTokens: 1, CompletionTokens: 1},
+		},
+	}
+
+	reg := provider.NewRegistry()
+	reg.Register(primary)
+	reg.Register(fallback)
+
+	target := strategy.RouteTarget{Provider: "openai", Model: "gpt-4o"}
+	r := router.New([]strategy.Strategy{&alwaysMatchStrategy{target: target}}, target)
+	convStore := conversation.NewStore(50, 24*time.Hour)
+	pipe := New(r, reg, convStore, nil)
+	pipe.SetFallbackChain([]FallbackModel{{Provider: "anthropic", Model: "claude-3-haiku"}})
+
+	req := &Request{
+		Model:    "auto",
+		Messages: []provider.Message{{Role: "user", Content: "test"}},
+	}
+
+	result, err := pipe.Execute(context.Background(), req)
+	if err != nil {
+		t.Fatalf("expected fallback to succeed, got error: %v", err)
+	}
+	if result.Response.Model != "claude-3-haiku" {
+		t.Errorf("expected fallback model 'claude-3-haiku', got %q", result.Response.Model)
+	}
+}
+
+func TestPipeline_RetrySucceeds(t *testing.T) {
+	p := &retryProvider{
+		failCount: 1,
+		response: &provider.ChatResponse{
+			ID:    "retry-resp",
+			Model: "gpt-4o",
+			Choices: []provider.Choice{
+				{Index: 0, Message: &provider.Message{Role: "assistant", Content: "Retry worked"}},
+			},
+			Usage: provider.Usage{PromptTokens: 1, CompletionTokens: 1},
+		},
+	}
+
+	reg := provider.NewRegistry()
+	reg.Register(p)
+
+	target := strategy.RouteTarget{Provider: "openai", Model: "gpt-4o"}
+	r := router.New([]strategy.Strategy{&alwaysMatchStrategy{target: target}}, target)
+	convStore := conversation.NewStore(50, 24*time.Hour)
+	pipe := New(r, reg, convStore, nil)
+	pipe.SetMaxRetries(2)
+
+	req := &Request{
+		Model:    "auto",
+		Messages: []provider.Message{{Role: "user", Content: "test"}},
+	}
+
+	result, err := pipe.Execute(context.Background(), req)
+	if err != nil {
+		t.Fatalf("expected retry to succeed: %v", err)
+	}
+	if result.Response.Choices[0].Message.Content != "Retry worked" {
+		t.Errorf("expected 'Retry worked', got %q", result.Response.Choices[0].Message.Content)
+	}
+}
+
+func TestPipeline_SetMaxRetries(t *testing.T) {
+	pipe := New(nil, nil, nil, nil)
+	pipe.SetMaxRetries(5)
+	if pipe.maxRetries != 5 {
+		t.Errorf("expected maxRetries 5, got %d", pipe.maxRetries)
+	}
+	pipe.SetMaxRetries(0)
+	if pipe.maxRetries != 5 {
+		t.Errorf("expected maxRetries unchanged (5), got %d", pipe.maxRetries)
+	}
+}
+
+func TestPipeline_SetFallbackChain(t *testing.T) {
+	pipe := New(nil, nil, nil, nil)
+	pipe.SetFallbackChain([]FallbackModel{
+		{Provider: "openai", Model: "gpt-4o-mini"},
+		{Provider: "groq", Model: "llama-3.1-8b"},
+	})
+	if len(pipe.fallbacks) != 2 {
+		t.Errorf("expected 2 fallbacks, got %d", len(pipe.fallbacks))
+	}
+}
+
+type retryProvider struct {
+	failCount int
+	attempts  int
+	response  *provider.ChatResponse
+}
+
+func (p *retryProvider) ID() string { return "openai" }
+
+func (p *retryProvider) ChatCompletion(ctx context.Context, req *provider.ChatRequest) (*provider.ChatResponse, error) {
+	p.attempts++
+	if p.attempts <= p.failCount {
+		return nil, fmt.Errorf("simulated failure attempt %d", p.attempts)
+	}
+	return p.response, nil
+}
+
+func (p *retryProvider) ChatCompletionStream(ctx context.Context, req *provider.ChatRequest) (<-chan provider.StreamChunk, error) {
+	p.attempts++
+	if p.attempts <= p.failCount {
+		return nil, fmt.Errorf("simulated failure attempt %d", p.attempts)
+	}
+	ch := make(chan provider.StreamChunk, 1)
+	ch <- provider.StreamChunk{ID: "r1", Model: p.response.Model}
+	close(ch)
+	return ch, nil
+}
+
+func (p *retryProvider) ListModels(ctx context.Context) ([]provider.ModelInfo, error) {
+	return nil, nil
+}
+func (p *retryProvider) Health(ctx context.Context) error { return nil }
+
 func TestRequest_Fields(t *testing.T) {
 	temp := 0.7
 	maxTok := 100

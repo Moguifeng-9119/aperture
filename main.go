@@ -72,6 +72,18 @@ func main() {
 	var recorder *analytics.Recorder
 	if db != nil {
 		recorder = analytics.NewRecorder(db)
+		for _, p := range reg.List() {
+			models, err := p.ListModels(context.Background())
+			if err != nil {
+				continue
+			}
+			for _, m := range models {
+				if m.CostPer1KInput > 0 || m.CostPer1KOutput > 0 {
+					recorder.SetModelCost(m.ID, m.CostPer1KInput, m.CostPer1KOutput)
+				}
+			}
+		}
+		slog.Info("analytics recorder initialized with model costs")
 	}
 
 	ruleEngine := buildRuleEngine(cfg)
@@ -106,6 +118,17 @@ func main() {
 	)
 
 	pipe := pipeline.New(r, reg, convStore, recorder)
+	if cfg.Routing.Fallback.Retry.MaxAttempts > 0 {
+		pipe.SetMaxRetries(cfg.Routing.Fallback.Retry.MaxAttempts)
+	}
+	if len(cfg.Routing.Fallback.Models) > 0 {
+		fbs := make([]pipeline.FallbackModel, len(cfg.Routing.Fallback.Models))
+		for i, fm := range cfg.Routing.Fallback.Models {
+			fbs[i] = pipeline.FallbackModel{Provider: fm.Provider, Model: fm.Model}
+		}
+		pipe.SetFallbackChain(fbs)
+		slog.Info("fallback chain configured", "models", len(fbs))
+	}
 
 	kvStore := newKVStore(db)
 	authMiddleware := setupAuth(cfg, kvStore)
