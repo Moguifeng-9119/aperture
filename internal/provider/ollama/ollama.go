@@ -16,6 +16,7 @@ import (
 )
 
 type Adapter struct {
+	id      string
 	client  *http.Client
 	baseURL string
 	models  []provider.ModelInfo
@@ -29,6 +30,7 @@ func New(cfg config.ProviderConfig) (*Adapter, error) {
 	baseURL = strings.TrimSuffix(baseURL, "/")
 
 	a := &Adapter{
+		id: cfg.ID,
 		client: &http.Client{
 			Timeout: 120 * time.Second,
 		},
@@ -49,7 +51,7 @@ func New(cfg config.ProviderConfig) (*Adapter, error) {
 	return a, nil
 }
 
-func (a *Adapter) ID() string { return "ollama" }
+func (a *Adapter) ID() string { return a.id }
 
 type ollamaRequest struct {
 	Model    string           `json:"model"`

@@ -17,6 +17,7 @@ import (
 )
 
 type Adapter struct {
+	id      string
 	client  *http.Client
 	apiKey  string
 	baseURL string
@@ -31,6 +32,7 @@ func New(cfg config.ProviderConfig) (*Adapter, error) {
 	baseURL = strings.TrimSuffix(baseURL, "/")
 
 	a := &Adapter{
+		id: cfg.ID,
 		client: &http.Client{
 			Timeout: 120 * time.Second,
 		},
@@ -52,7 +54,7 @@ func New(cfg config.ProviderConfig) (*Adapter, error) {
 	return a, nil
 }
 
-func (a *Adapter) ID() string { return "openai" }
+func (a *Adapter) ID() string { return a.id }
 
 func (a *Adapter) ChatCompletion(ctx context.Context, req *provider.ChatRequest) (*provider.ChatResponse, error) {
 	url := a.baseURL + "/chat/completions"

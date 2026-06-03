@@ -121,10 +121,15 @@ func (a *App) InitServer() {
 
 	var rateMiddleware func(http.Handler) http.Handler
 	if a.db != nil {
-		keyStore := &keyStoreAdapter{inner: store.NewAPIKeyStore(a.db)}
-		authM := auth.NewMiddleware(keyStore, a.cfg.Auth.RateLimitDefaultRPM)
-		rateMiddleware = authM.Authenticate
-		slog.Info("rate limiting enabled", "rpm", a.cfg.Auth.RateLimitDefaultRPM)
+		keys, _ := a.db.ListAPIKeys()
+		if len(keys) > 0 {
+			keyStore := &keyStoreAdapter{inner: store.NewAPIKeyStore(a.db)}
+			authM := auth.NewMiddleware(keyStore, a.cfg.Auth.RateLimitDefaultRPM)
+			rateMiddleware = authM.Authenticate
+			slog.Info("rate limiting enabled", "rpm", a.cfg.Auth.RateLimitDefaultRPM, "keys", len(keys))
+		} else {
+			slog.Info("no API keys configured, auth disabled")
+		}
 	}
 
 	a.server = server.New(a.cfg, a.registry, a.pipeline, rateMiddleware)
@@ -133,7 +138,10 @@ func (a *App) InitServer() {
 func (a *App) Run() error {
 	mux := http.NewServeMux()
 	mux.Handle("/v1/", a.server.Handler())
-	mux.Handle("/health", a.server.Handler())
+	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"status":"ok","version":"0.7.3"}`))
+	})
 	mux.Handle("/metrics", a.metrics.Handler())
 
 	if a.db != nil {
