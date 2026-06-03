@@ -124,12 +124,16 @@ providers:
   # - id: "deepseek"
   #   type: "openai"
   #   api_key: "${DEEPSEEK_API_KEY}"
-  #   base_url: "https://api.deepseek.com/v1"
+  #   base_url: "https://api.deepseek.com"
   #   models:
-  #     - id: "deepseek-chat"
+  #     - id: "deepseek-v4-flash"
   #       cost_per_1k_input: 0.00014
   #       cost_per_1k_output: 0.00028
-  #       max_tokens: 65536
+  #       max_tokens: 1048576
+  #     - id: "deepseek-v4-pro"
+  #       cost_per_1k_input: 0.000435
+  #       cost_per_1k_output: 0.00087
+  #       max_tokens: 1048576
   #
   # - id: "qwen"
   #   type: "openai"
