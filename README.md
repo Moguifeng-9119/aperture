@@ -24,13 +24,17 @@ Every LLM request is different. A simple "hello" doesn't need GPT-4o, and a comp
 - [x] Multi-provider: OpenAI, Anthropic, Groq, Ollama
 - [x] Streaming (SSE) and non-streaming responses
 - [x] Tier 1: Rule-based routing (keywords, regex, token count)
-- [x] Tier 2: Embedding similarity routing (keyword vector fallback)
+- [x] Tier 2: Real embedding routing (OpenAI text-embedding-3-small, keyword vector fallback)
 - [x] Tier 3: ML classifier (local ONNX, trainable)
 - [x] Built-in admin dashboard (HTMX + Alpine.js + Chart.js)
 - [x] Admin API (analytics, API key CRUD, routing test)
 - [x] Cost tracking and savings calculation
 - [x] Multi-turn conversation context
 - [x] API key authentication + rate limiting
+- [x] Pipeline fallback chain + retry on provider errors
+- [x] A/B testing: compare two routing strategies side-by-side
+- [x] Training data export (JSONL format for ML training)
+- [x] Docker Compose (aperture + ollama)
 - [x] Prometheus metrics endpoint (`/metrics`)
 - [x] Graceful shutdown
 - [x] Single binary build + Docker image + goreleaser
@@ -148,10 +152,12 @@ GET /health
 GET    /admin/v1/health
 GET    /admin/v1/analytics/summary?from=&to=&project_id=
 GET    /admin/v1/analytics/requests?page=&per_page=
+GET    /admin/v1/analytics/export?from=&to=          (JSONL training data)
 POST   /admin/v1/routing/test          { "messages": [...] }
 GET    /admin/v1/keys
 POST   /admin/v1/keys                  { "name": "my-key" }
 DELETE /admin/v1/keys/{id}
+GET    /admin/v1/ab-test/stats         (A/B comparison stats)
 ```
 
 ### Metrics
@@ -161,42 +167,28 @@ GET /metrics     (Prometheus text format)
 
 ## Roadmap
 
-### Completed (v0.1 – v0.3)
-| Phase | Feature | Status |
-|-------|---------|:------:|
-| 1 | Core proxy + OpenAI adapter + build pipeline | Done |
-| 2 | Multi-provider (4) + rule-based routing + streaming | Done |
-| 3 | Embedding classification + cost analytics + SQLite | Done |
-| 4 | Admin dashboard UI + admin API | Done |
-| 5 | ML classifier scaffold + Prometheus metrics | Done |
-| — | 141 unit + integration tests, CI workflow | Done |
+### Completed
+| Version | Feature | |
+|---------|---------|:--:|
+| **v0.1** | Core proxy + OpenAI adapter + Docker + goreleaser | ✓ |
+| **v0.2** | 4 providers (OpenAI, Anthropic, Groq, Ollama) + rule-based routing + streaming | ✓ |
+| **v0.3** | Embedding classification + cost analytics + SQLite + dashboard UI + admin API | ✓ |
+| **v0.4** | Fallback chain + retry + rate limiter + model cost wiring + Docker Compose + CI | ✓ |
+| **v0.5** | Real embeddings (OpenAI) + A/B testing + training data export | ✓ |
+| **—** | 14 test packages, 4 provider tests, CI (Go 1.25, go vet, build) | ✓ |
 
-### Next (v0.4 — v0.6)
-| Milestone | Feature | Effort |
-|-----------|---------|:------:|
-| **v0.4** | **Production readiness** | 1-2 weeks |
-| | Wire provider model costs into analytics recorder | S |
-| | Pipeline fallback/retry on provider errors | M |
-| | Rate limiter middleware wired into server | S |
-| | HTTP-level integration tests (httptest + real server) | M |
-| | Docker Compose for local dev (`aperture + ollama`) | S |
-| | Health dashboard: provider status, uptime, error rate | S |
-| **v0.5** | **Smart routing upgrade** | 2-3 weeks |
-| | OpenAI/Anthropic embeddings API integration (Tier 2 real) | M |
-| | Embedding quality evaluation harness | M |
-| | Training data export from SQLite → labeled dataset | M |
-| | `train_model.py` refinement + model quality metrics | L |
-| | A/B testing: run two strategies side-by-side, compare accuracy | M |
-| **v0.6** | **Operations & observability** | 2 weeks |
-| | OpenTelemetry distributed tracing (span per pipeline stage) | M |
-| | Structured error codes (replacing raw error strings) | M |
-| | Request log search/filter in dashboard | M |
-| | Helm chart for Kubernetes deployment | M |
-| | Load testing suite (vegeta or k6 scripts) | M |
+### Next (v0.6)
+| Feature | Effort |
+|---------|:------:|
+| OpenTelemetry distributed tracing (span per pipeline stage) | M |
+| Structured error codes (replacing raw error strings) | M |
+| Helm chart for Kubernetes deployment | M |
+| Load testing suite (vegeta or k6 scripts) | M |
+| Request log search/filter in dashboard | M |
 
 ### Future (v0.7 — v1.0)
-| Milestone | Feature |
-|-----------|---------|
+| Version | Feature |
+|---------|---------|
 | **v0.7** | Token-aware routing: estimate cost BEFORE dispatching |
 | **v0.8** | Multi-tenancy: project isolation, per-project budgets, usage quotas |
 | **v0.9** | Caching layer: cache identical/similar requests to skip API calls |
@@ -206,11 +198,22 @@ GET /metrics     (Prometheus text format)
 
 ```bash
 make build        # build binary
-make test         # run all tests with race detector
+make dev          # go run
+make test         # run all tests
 make test-cover   # run tests + generate coverage HTML
 make lint         # go vet
 make docker-build # build Docker image
+make docker-run   # run with Docker
 ```
+
+### Docker Compose (local dev)
+```bash
+docker compose up -d    # aperture + ollama, ready at :8080
+```
+
+## License
+
+MIT
 
 ## License
 
